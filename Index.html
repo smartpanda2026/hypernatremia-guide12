@@ -1,0 +1,2155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hypernatremia Calculator v7 — Decomposed Losses + EFWC + Tonicity Matcher</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); min-height: 100vh; padding: 20px; color: #1a2a3a; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { background: linear-gradient(135deg, #1a5276 0%, #2e86c1 100%); color: white; padding: 30px 40px; border-radius: 16px 16px 0 0; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    header h1 { font-size: 1.45rem; font-weight: 700; margin-bottom: 8px; }
+    header p { opacity: 0.9; font-size: 0.95rem; }
+    .evidence-banner { background: linear-gradient(135deg, #7d3c98 0%, #a569bd 100%); color: white; padding: 14px 20px; margin-top: 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.5; }
+    .evidence-banner strong { color: #f4ecf7; }
+    .nejm-banner { background: linear-gradient(135deg, #1a5276 0%, #2874a6 100%); color: white; padding: 14px 20px; margin-top: 10px; border-radius: 10px; font-size: 0.85rem; line-height: 1.5; }
+    .nejm-banner strong { color: #d4e6f1; }
+    .main-panel { background: white; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 30px 40px 40px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; border-bottom: 1px solid #e8edf2; }
+    .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .section-title { font-size: 1.15rem; font-weight: 700; color: #1a5276; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .section-title .num { background: #2e86c1; color: white; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+    .subsection-title { font-size: 1rem; font-weight: 700; color: #2874a6; margin: 16px 0 10px; padding-left: 8px; border-left: 3px solid #2e86c1; }
+    .input-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .input-row.tight { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.85rem; font-weight: 600; color: #4a5a6a; }
+    .input-group input, .input-group select { padding: 10px 12px; border: 2px solid #dce4ec; border-radius: 8px; font-size: 0.95rem; transition: border-color 0.2s; background: #fafbfc; }
+    .input-group input:focus, .input-group select:focus { outline: none; border-color: #2e86c1; background: white; }
+    .input-group .hint { font-size: 0.75rem; color: #8a9aa8; }
+    .input-group .hint.warn { color: #c0392b; font-weight: 600; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+    .btn-primary { background: #2e86c1; color: white; }
+    .btn-primary:hover { background: #1a5276; }
+    .btn-secondary { background: #e8edf2; color: #4a5a6a; }
+    .btn-secondary:hover { background: #dce4ec; }
+    .btn-small { padding: 6px 12px; font-size: 0.8rem; }
+    .btn-danger { background: #c0392b; color: white; }
+    .btn-danger:hover { background: #922b21; }
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    .result-card { background: #f8fafc; border-radius: 12px; padding: 20px; margin-top: 16px; border-left: 4px solid #2e86c1; }
+    .result-card.warning { border-left-color: #e67e22; background: #fef9f3; }
+    .result-card.danger { border-left-color: #c0392b; background: #fdf2f0; }
+    .result-card.success { border-left-color: #27ae60; background: #f0faf4; }
+    .result-card.rescue { border-left-color: #e67e22; background: #fef5e7; }
+    .result-card.enteral { border-left-color: #16a085; background: #eafaf1; }
+    .result-card.evidence { border-left-color: #7d3c98; background: #f5eef8; }
+    .result-card.nejm { border-left-color: #1a5276; background: #eaf4fc; }
+    .result-card.fast { border-left-color: #8e44ad; background: #f4ecf7; }
+    .result-card.rrt { border-left-color: #2980b9; background: #eaf2f8; }
+    .result-card.ddavp { border-left-color: #8e44ad; background: #f5eef8; }
+    .result-card.loss-decomp { border-left-color: #16a085; background: #eafaf1; }
+    .result-card.efwc { border-left-color: #d35400; background: #fef5e7; }
+    .result-card.tonicity { border-left-color: #2471a3; background: #eaf2f8; }
+    .result-card.refs { border-left-color: #566573; background: #f4f6f7; }
+    .result-card h4 { font-size: 1rem; margin-bottom: 10px; color: #1a2a3a; }
+    .result-card p, .result-card li { font-size: 0.9rem; line-height: 1.6; color: #3a4a5a; }
+    .result-card ul { padding-left: 20px; margin-top: 8px; }
+    .result-card li { margin-bottom: 4px; }
+    .alert-box { background: #fef9e7; border: 1px solid #f9e79f; border-radius: 8px; padding: 14px 18px; margin-top: 14px; font-size: 0.88rem; line-height: 1.5; color: #7d6608; }
+    .alert-box strong { color: #6c5500; }
+    .alert-box.danger { background: #fdedec; border-color: #f5b7b1; color: #922b21; }
+    .alert-box.success { background: #eafaf1; border-color: #a9dfbf; color: #1e8449; }
+    .alert-box.rescue { background: #fdebd0; border-color: #f5b041; color: #7e5109; }
+    .alert-box.info { background: #eaf4fc; border-color: #aed6f1; color: #1a5276; }
+    .alert-box.enteral { background: #eafaf1; border-color: #a9dfbf; color: #1e8449; }
+    .alert-box.evidence { background: #f5eef8; border-color: #d7bde2; color: #5b2c6f; }
+    .alert-box.fast { background: #f4ecf7; border-color: #d2b4de; color: #6c3483; }
+    .alert-box.rrt { background: #eaf2f8; border-color: #aed6f1; color: #1a5276; }
+    .alert-box.ddavp { background: #f5eef8; border-color: #d7bde2; color: #5b2c6f; }
+    .alert-box.efwc { background: #fef5e7; border-color: #f5cba7; color: #7e5109; }
+    .alert-box.tonicity { background: #eaf2f8; border-color: #aed6f1; color: #1a5276; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.82rem; }
+    th, td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #e8edf2; }
+    th { background: #f0f4f8; font-weight: 600; color: #1a5276; position: sticky; top: 0; font-size: 0.78rem; }
+    tr:hover { background: #f8fafc; }
+    .table-wrapper { max-height: 520px; overflow-y: auto; border: 1px solid #e8edf2; border-radius: 8px; margin-top: 12px; }
+    .hidden { display: none; }
+    .footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #8a9aa8; line-height: 1.5; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-right: 6px; }
+    .badge-blue { background: #d4e6f1; color: #1a5276; }
+    .badge-orange { background: #fdebd0; color: #b85c00; }
+    .badge-red { background: #fadbd8; color: #a93226; }
+    .badge-green { background: #d5f5e3; color: #1e8449; }
+    .badge-teal { background: #d1f2eb; color: #0e6251; }
+    .badge-purple { background: #e8daef; color: #5b2c6f; }
+    .measured-input { width: 78px; padding: 5px 6px; border: 2px solid #2e86c1; border-radius: 6px; font-size: 0.8rem; text-align: center; background: #eaf4fc; }
+    .measured-input:focus { outline: none; border-color: #1a5276; box-shadow: 0 0 0 3px rgba(46,134,193,0.2); }
+    .time-input { width: 70px; padding: 5px 6px; border: 2px solid #27ae60; border-radius: 6px; font-size: 0.8rem; text-align: center; background: #eafaf1; }
+    .time-input:focus { outline: none; border-color: #1e8449; box-shadow: 0 0 0 3px rgba(39,174,96,0.2); }
+    .rescue-rate { font-weight: 700; color: #e67e22; font-size: 1.2rem; }
+    .enteral-rate { font-weight: 700; color: #16a085; font-size: 1.1rem; }
+    .mortality-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; margin: 4px 0; }
+    .mortality-low { background: #d5f5e3; color: #1e8449; }
+    .mortality-mid { background: #fdebd0; color: #b85c00; }
+    .mortality-high { background: #fadbd8; color: #a93226; }
+    .row-measured { background: #fff5e6 !important; border-left: 4px solid #e67e22; }
+    .row-measured td { font-weight: 600; }
+    .row-step { background: #eaf4fc !important; }
+    .row-step td { font-weight: 600; color: #1a5276; }
+    .row-predicted { background: #fffbea !important; }
+    .row-predicted td { font-weight: 600; color: #7d6608; }
+    .row-rescue { background: #fdebd0 !important; border-left: 4px solid #e67e22; }
+    .row-rescue td { font-weight: 600; color: #7e5109; }
+    .row-stop-rescue { background: #fce4d6 !important; border-left: 4px solid #c0392b; }
+    .row-stop-rescue td { font-weight: 600; color: #922b21; }
+    .row-maint { background: #eafaf1 !important; border-left: 4px solid #27ae60; }
+    .row-maint td { font-weight: 600; color: #1e8449; }
+    .row-overwater { background: #fadbd8 !important; border-left: 4px solid #c0392b; }
+    .row-overwater td { font-weight: 700; color: #922b21; }
+    .row-fast { background: #f4ecf7 !important; border-left: 4px solid #8e44ad; }
+    .row-fast td { font-weight: 600; color: #6c3483; }
+    .row-rrt { background: #eaf2f8 !important; border-left: 4px solid #2980b9; }
+    .row-rrt td { font-weight: 600; color: #1a5276; }
+    .chart-container { position: relative; height: 460px; margin-top: 12px; background: white; border-radius: 8px; padding: 10px; border: 1px solid #e8edf2; }
+    .legend-note { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; font-size: 0.82rem; color: #4a5a6a; }
+    .legend-note span::before { content: ''; display: inline-block; width: 14px; height: 4px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+    .legend-ideal::before { background: #2e86c1; }
+    .legend-real::before { background: #c0392b; }
+    .legend-band::before { background: rgba(39,174,96,0.35); height: 12px; border-radius: 3px; }
+    .legend-predicted::before { background: #f1c40f; }
+    .legend-sim::before { background: #8e44ad; }
+    .legend-rescue::before { background: #e67e22; }
+    .legend-postrescue::before { background: #27ae60; }
+    .legend-maint::before { background: #16a085; }
+    .legend-enteral::before { background: #0e6251; }
+    .legend-rrt::before { background: #2980b9; }
+    .trigger-pill { display: inline-block; padding: 2px 8px; background: #fdebd0; color: #7e5109; border-radius: 10px; font-size: 0.72rem; font-weight: 700; margin-right: 6px; }
+    .trigger-pill.water { background: #fadbd8; color: #922b21; }
+    .trigger-pill.enteral { background: #d1f2eb; color: #0e6251; }
+    .trigger-pill.failure { background: #f4ecf7; color: #6c3483; }
+    .trigger-pill.rrt { background: #eaf2f8; color: #1a5276; }
+    .trigger-pill.ddavp { background: #f5eef8; color: #5b2c6f; }
+    .formula-box { background: #f4f6f8; border-left: 3px solid #1a5276; padding: 10px 14px; margin: 10px 0; font-family: 'Courier New', monospace; font-size: 0.85rem; color: #1a2a3a; border-radius: 4px; }
+    .mode-selector { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .mode-btn { flex: 1; min-width: 140px; padding: 14px 16px; border: 2px solid #dce4ec; border-radius: 10px; background: white; cursor: pointer; text-align: left; transition: all 0.2s; font-family: inherit; }
+    .mode-btn:hover { border-color: #2e86c1; background: #f0f8ff; }
+    .mode-btn.active { border-color: #2e86c1; background: #eaf4fc; box-shadow: 0 0 0 3px rgba(46,134,193,0.15); }
+    .mode-btn.active.fast { border-color: #8e44ad; background: #f4ecf7; box-shadow: 0 0 0 3px rgba(142,68,173,0.15); }
+    .mode-btn.active.ultra { border-color: #c0392b; background: #fdf2f0; box-shadow: 0 0 0 3px rgba(192,57,43,0.15); }
+    .mode-btn .mode-title { font-weight: 700; font-size: 0.9rem; color: #1a2a3a; margin-bottom: 4px; }
+    .mode-btn .mode-sub { font-size: 0.75rem; color: #6a7a8a; line-height: 1.4; }
+    .mode-btn .mode-evidence { font-size: 0.7rem; color: #7d3c98; font-weight: 600; margin-top: 4px; }
+    .mode-btn .mode-ref { font-size: 0.68rem; color: #1a5276; font-weight: 600; margin-top: 2px; }
+    .loss-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin: 10px 0; border: 1px solid #dce4ec; }
+    .loss-bar-seg { display: flex; align-items: center; justify-content: center; color: white; font-size: 0.72rem; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: all 0.2s; }
+    .loss-bar-seg:hover { filter: brightness(1.15); }
+    .tonicity-card { display: inline-block; padding: 10px 16px; border-radius: 8px; margin: 4px; font-weight: 700; border: 2px solid; }
+    .tonicity-primary { background: #d4efdf; color: #1e8449; border-color: #27ae60; }
+    .tonicity-secondary { background: #fdebd0; color: #b85c00; border-color: #e67e22; }
+    .tonicity-d5w { background: #d4e6f1; color: #1a5276; border-color: #2e86c1; }
+    .ref-list { font-size: 0.82rem; line-height: 1.7; color: #3a4a5a; }
+    .ref-list li { margin-bottom: 6px; }
+    @media (max-width: 768px) { header { padding: 20px; } header h1 { font-size: 1.05rem; } .main-panel { padding: 20px; } table { font-size: 0.7rem; } th, td { padding: 4px; } .chart-container { height: 340px; } .mode-btn { min-width: 100%; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+    <h1>Hypernatremia Calculator v7 — Decomposed Losses + EFWC + Tonicity Matcher</h1>
+    <p>Watson TBW · Adrogué-Madias · Decomposed ongoing losses · Standalone EFWC · Tonicity-matched fluids · RRT · Desmopressin</p>
+    <div class="nejm-banner">
+        <strong>📘 NEJM baseline (Adrogué &amp; Madias, N Engl J Med 2000;342:1493-9):</strong> Traditional correction ceiling — <strong>≤10 mEq/L/24h (≤0.42 mEq/L/h)</strong> for chronic hypernatremia; rapid correction only for acute (&lt;48h) cases. This is the <strong>Regular</strong> rate of correction. Ongoing losses must be <strong>added</strong> on top of the static deficit.
+    </div>
+    <div class="evidence-banner">
+        <strong>📊 Feigin 2023 (JAMA Netw Open. 2023;6(9):e2335415):</strong> In 4,265 adults with severe hypernatremia (Na ≥155 mEq/L), fast correction (&gt;0.5 mEq/L/h) associated with <strong>lower 30-day mortality</strong> (31.8% vs 50.7%; aOR 2.02, 95% CI 1.55–2.62) and <strong>no neurological complications</strong>.
+    </div>
+</header>
+
+<div class="main-panel">
+
+    <div class="section" id="step1">
+        <div class="section-title"><span class="num">1</span> Correction Strategy (Evidence-Based)</div>
+        <p style="font-size:0.88rem; color:#4a5a6a; margin-bottom:12px;">Select a correction mode. <strong>Regular (NEJM)</strong> is the traditional baseline from Adrogué &amp; Madias 2000. <strong>Fast</strong> and <strong>Ultra-Fast</strong> reflect the Feigin et al. 2023 findings.</p>
+        <div class="mode-selector" id="modeSelector">
+            <button class="mode-btn" data-mode="conservative" onclick="selectMode('conservative')">
+                <div class="mode-title">🛡️ Conservative</div>
+                <div class="mode-sub">≤ 8 mEq/L/24h<br>≤ 0.33 mEq/L/h</div>
+                <div class="mode-evidence">Traditional expert opinion</div>
+                <div class="mode-ref">Below NEJM baseline</div>
+            </button>
+            <button class="mode-btn active" data-mode="regular" onclick="selectMode('regular')">
+                <div class="mode-title">📘 Regular (NEJM)</div>
+                <div class="mode-sub">≤ 10 mEq/L/24h<br>≤ 0.42 mEq/L/h</div>
+                <div class="mode-evidence">Adrogué &amp; Madias 2000</div>
+                <div class="mode-ref">NEJM baseline</div>
+            </button>
+            <button class="mode-btn fast" data-mode="fast" onclick="selectMode('fast')">
+                <div class="mode-title">⚡ Fast (Feigin)</div>
+                <div class="mode-sub">≤ 12 mEq/L/24h<br>≤ 0.5 mEq/L/h</div>
+                <div class="mode-evidence">Feigin: aOR 2.02 survival</div>
+                <div class="mode-ref">JAMA Netw Open 2023</div>
+            </button>
+            <button class="mode-btn ultra" data-mode="ultra" onclick="selectMode('ultra')">
+                <div class="mode-title">🚀 Ultra-Fast</div>
+                <div class="mode-sub">≤ 18 mEq/L/24h<br>≤ 0.75 mEq/L/h</div>
+                <div class="mode-evidence">Feigin: &gt;12 → 72.1% survival</div>
+                <div class="mode-ref">Observational extrapolation</div>
+            </button>
+        </div>
+
+        <div class="section-title" style="margin-top:24px;"><span class="num">2</span> Patient Parameters</div>
+        <div class="input-row">
+            <div class="input-group"><label>Initial Serum Na⁺ (mEq/L)</label><input type="number" id="serumNa" placeholder="e.g., 158" min="146" max="220" step="0.1"></div>
+            <div class="input-group"><label>Body Weight (kg)</label><input type="number" id="weight" placeholder="e.g., 70" min="1" max="300" step="0.1"></div>
+            <div class="input-group"><label>Height (cm)</label><input type="number" id="height" placeholder="e.g., 170" min="50" max="250" step="0.1"></div>
+            <div class="input-group"><label>Age (years)</label><input type="number" id="age" placeholder="e.g., 65" min="1" max="120" step="1"></div>
+        </div>
+        <div class="input-row">
+            <div class="input-group"><label>Sex</label><select id="sex"><option value="male">Male</option><option value="female">Female</option></select></div>
+            <div class="input-group"><label>Serum Glucose (mg/dL)</label><input type="number" id="glucose" value="100" min="20" max="2000" step="1"><span class="hint">For corrected Na⁺ (Hillier)</span></div>
+            <div class="input-group"><label>Hypernatremia Duration</label>
+                <select id="duration">
+                    <option value="acute">Acute (&lt;48h)</option>
+                    <option value="chronic" selected>Chronic (&gt;48h)</option>
+                </select>
+            </div>
+            <div class="input-group"><label>Etiology</label>
+                <select id="etiology">
+                    <option value="mixed" selected>Mixed / Unknown</option>
+                    <option value="central_di">Central Diabetes Insipidus</option>
+                    <option value="nephrogenic_di">Nephrogenic Diabetes Insipidus</option>
+                    <option value="osmotic">Osmotic Diuresis</option>
+                    <option value="water_loss">Pure Water Loss</option>
+                    <option value="icu">ICU-Acquired</option>
+                    <option value="renal_failure">Renal Failure + Volume Overload</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="subsection-title">🔥 Insensible Loss Modifiers (fever / tachypnea / burns)</div>
+        <div class="input-row tight">
+            <div class="input-group"><label>Insensible Base (mL/kg/day)</label>
+                <input type="number" id="insensibleBase" value="12.5" min="5" max="25" step="0.5">
+                <span class="hint">Afebrile adult: 10–15 mL/kg/day</span>
+            </div>
+            <div class="input-group"><label>Temperature (°C)</label>
+                <input type="number" id="tempC" value="37.0" min="34" max="43" step="0.1">
+                <span class="hint">Fever: +10–15% per °C &gt;38</span>
+            </div>
+            <div class="input-group"><label>Fever Multiplier (%/°C &gt;38)</label>
+                <input type="number" id="feverMult" value="12" min="5" max="20" step="1">
+            </div>
+            <div class="input-group"><label>Tachypnea?</label>
+                <select id="tachypnea"><option value="no">No</option><option value="yes">Yes (+15%)</option></select>
+            </div>
+            <div class="input-group"><label>Burns / Open Wounds?</label>
+                <select id="burns"><option value="no">No</option><option value="yes">Yes (+25%)</option></select>
+            </div>
+            <div class="input-group"><label>Unhumidified Ventilator?</label>
+                <select id="vent"><option value="no">No</option><option value="yes">Yes (+20%)</option></select>
+            </div>
+        </div>
+
+        <div class="subsection-title">💧 Decomposed Ongoing Losses</div>
+        <div class="input-row tight">
+            <div class="input-group"><label>Urine Output (mL/hr)</label>
+                <input type="number" id="urineOutput" value="0" min="0" max="1000" step="5">
+                <span class="hint">Feeds EFWC below</span>
+            </div>
+            <div class="input-group"><label>Urine Na⁺ (mEq/L)</label>
+                <input type="number" id="urineNa" value="0" min="0" max="300" step="1">
+            </div>
+            <div class="input-group"><label>Urine Osm (mOsm/kg)</label>
+                <input type="number" id="urineOsm" value="0" min="0" max="1500" step="1">
+                <span class="hint">Used if urine Na⁺ = 0</span>
+            </div>
+            <div class="input-group"><label>GI Output (mL/hr)</label>
+                <input type="number" id="giOutput" value="0" min="0" max="1000" step="5">
+            </div>
+            <div class="input-group"><label>GI Na⁺ (mEq/L)</label>
+                <input type="number" id="giNa" value="0" min="0" max="200" step="1">
+                <span class="hint">0 = assume 30% free water</span>
+            </div>
+            <div class="input-group"><label>NG Output (mL/hr)</label>
+                <input type="number" id="ngOutput" value="0" min="0" max="1000" step="5">
+            </div>
+            <div class="input-group"><label>NG Na⁺ (mEq/L)</label>
+                <input type="number" id="ngNa" value="0" min="0" max="200" step="1">
+            </div>
+            <div class="input-group"><label>Ostomy Output (mL/hr)</label>
+                <input type="number" id="ostomyOutput" value="0" min="0" max="1000" step="5">
+            </div>
+            <div class="input-group"><label>Ostomy Na⁺ (mEq/L)</label>
+                <input type="number" id="ostomyNa" value="0" min="0" max="200" step="1">
+            </div>
+        </div>
+        <div class="input-row tight">
+            <div class="input-group"><label>Measured Insensible (mL/hr)</label>
+                <input type="number" id="lossRate" value="62.5" min="0" max="600" step="0.5">
+                <span class="hint">Override; default 62.5 (=1.5 L/day)</span>
+            </div>
+            <div class="input-group"><label>Enteral Free Water (mL/hr)</label>
+                <input type="number" id="enteralRate" value="0" min="0" max="500" step="5">
+            </div>
+            <div class="input-group"><label>ICU Admission?</label>
+                <select id="icu"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+            <div class="input-group"><label>Charlson Comorbidity Index</label>
+                <input type="number" id="charlson" value="4" min="0" max="15" step="1">
+            </div>
+            <div class="input-group"><label>RRT Modality</label>
+                <select id="rrt">
+                    <option value="none" selected>None</option>
+                    <option value="cvvh">CVVH / CVVHDF</option>
+                    <option value="ihd">Intermittent Hemodialysis</option>
+                    <option value="peritoneal">Peritoneal Dialysis</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-row tight">
+            <div class="input-group"><label>Prediction Horizon (hours)</label>
+                <select id="predictionHorizon">
+                    <option value="2">2 hours</option>
+                    <option value="4" selected>4 hours</option>
+                    <option value="6">6 hours</option>
+                    <option value="8">8 hours</option>
+                    <option value="12">12 hours</option>
+                </select>
+            </div>
+            <div class="input-group"><label>Max D5W Rate (mL/hr)</label>
+                <input type="number" id="maxRate" value="360" readonly style="background:#f0f4f8;">
+            </div>
+            <div class="input-group"><label>Max Free Water per Day (mL)</label>
+                <input type="number" id="maxFreeWater" value="3000" min="500" max="10000" step="100">
+            </div>
+        </div>
+
+        <!-- ============ STANDALONE EFWC CALCULATOR ============ -->
+        <div class="subsection-title">🧪 Standalone EFWC Calculator (urine/serum studies)</div>
+        <div class="input-row tight">
+            <div class="input-group"><label>Serum Na⁺ (mEq/L)</label>
+                <input type="number" id="efwcSerumNa" placeholder="auto from above" min="100" max="200" step="0.1">
+            </div>
+            <div class="input-group"><label>Serum K⁺ (mEq/L)</label>
+                <input type="number" id="efwcSerumK" value="4.0" min="1" max="8" step="0.1">
+            </div>
+            <div class="input-group"><label>Urine Na⁺ (mEq/L)</label>
+                <input type="number" id="efwcUrineNa" value="0" min="0" max="300" step="1">
+            </div>
+            <div class="input-group"><label>Urine K⁺ (mEq/L)</label>
+                <input type="number" id="efwcUrineK" value="0" min="0" max="200" step="1">
+            </div>
+            <div class="input-group"><label>Urine Osm (mOsm/kg)</label>
+                <input type="number" id="efwcUrineOsm" value="0" min="0" max="1500" step="1">
+            </div>
+            <div class="input-group"><label>Urine Volume (mL/day)</label>
+                <input type="number" id="efwcUrineVol" value="0" min="0" max="20000" step="50">
+            </div>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+            <button class="btn btn-secondary btn-small" onclick="computeStandaloneEFWC()">Compute EFWC</button>
+            <button class="btn btn-secondary btn-small" onclick="syncEFWCFromMain()">Sync from main inputs</button>
+        </div>
+        <div id="efwcStandaloneResult"></div>
+
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="calculate()">Calculate</button>
+            <button class="btn btn-secondary" onclick="resetAll()">↺ Reset</button>
+        </div>
+    </div>
+
+    <div class="section hidden" id="step2">
+        <div class="section-title"><span class="num">3</span> Results, Decomposed Losses, Tonicity Matcher & Master Table</div>
+        <div id="resultsContainer"></div>
+        <div class="btn-row" style="margin-top:20px;">
+            <button class="btn btn-secondary" onclick="resetAll()">↺ New Calculation</button>
+        </div>
+    </div>
+
+</div>
+
+<div class="footer">
+    <p><strong>Clinical Disclaimer:</strong> Educational tool integrating Adrogué &amp; Madias (NEJM 2000) as the Regular baseline with Feigin et al. (JAMA Netw Open 2023). Verify all calculations. Max D5W rate 360 mL/hr. Max 3% saline rate 100 mL/hr. Fast/Ultra-Fast modes are based on observational data — use with q2–4h Na⁺ monitoring and clinical judgment. Watson formula valid for adults &gt;18 years. Desmopressin dosing, RRT prescriptions, and tonicity-matched fluids are starting points only — individualize per institutional protocol. <strong>Observed Na⁺ change exceeded formula prediction in ~74% of cases (Scorza 2024) — titrate to serial Na⁺ q2–4h.</strong></p>
+</div>
+</div>
+
+<script>
+/* ============================================================
+   GLOBAL STATE & CONSTANTS
+   ============================================================ */
+let patientData = {};
+let naChart = null;
+let entryCounter = 0;
+let currentMode = 'regular';
+
+const NACL_3PCT_CONC = 513;
+const NACL_0_9_CONC = 154;
+const NACL_0_45_CONC = 77;
+const NACL_0_2_CONC = 34;
+const ABSOLUTE_LOW_NA = 130;
+const FLOOR_BUFFER = 2;
+const MAX_DROP_48H = 18;
+const MIN_RESCUE_HOURS = 4;
+const MAX_RESCUE_HOURS = 5;
+const RESCUE_TARGET_RISE = 0.5;
+const MAX_3PCT_RATE = 100;
+const TARGET_HORIZON = 24;
+const FLOOR_TOLERANCE = 0.5;
+const FAILURE_TO_CORRECT_RATIO = 0.3;
+const DEFAULT_SENSIBLE_LOSS = 62.5; // 1.5 L/day
+
+const MODES = {
+    conservative: { label: 'Conservative', maxDrop24h: 8, maxDropPerHour: 8/24, color: '#27ae60', badge: 'badge-green', mortality30d: 0.507, evidence: 'Traditional expert opinion', ref: 'Below NEJM baseline' },
+    regular:      { label: 'Regular (NEJM)', maxDrop24h: 10, maxDropPerHour: 10/24, color: '#2e86c1', badge: 'badge-blue', mortality30d: 0.507, evidence: 'Adrogué & Madias, N Engl J Med 2000;342:1493-9', ref: 'NEJM baseline' },
+    fast:         { label: 'Fast (Feigin)', maxDrop24h: 12, maxDropPerHour: 0.5, color: '#8e44ad', badge: 'badge-purple', mortality30d: 0.318, evidence: 'Feigin: aOR 2.02 survival; >8 mEq/L/24h → 64.4% survival', ref: 'JAMA Netw Open 2023' },
+    ultra:        { label: 'Ultra-Fast',   maxDrop24h: 18, maxDropPerHour: 0.75, color: '#c0392b', badge: 'badge-red', mortality30d: 0.279, evidence: 'Feigin: >12 mEq/L/24h → 72.1% survival (extrapolated)', ref: 'Observational extrapolation' }
+};
+
+function selectMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active', 'fast', 'ultra');
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active');
+            if (mode === 'fast') btn.classList.add('fast');
+            if (mode === 'ultra') btn.classList.add('ultra');
+        }
+    });
+}
+
+function watsonTBW(sex, weight, height, age) {
+    if (sex === 'male') {
+        return 2.447 + (0.3362 * weight) + (0.1074 * height) - (0.09516 * age);
+    } else {
+        return -2.097 + (0.2466 * weight) + (0.1069 * height);
+    }
+}
+
+function correctedSodium(measuredNa, glucoseMgdl) {
+    if (glucoseMgdl <= 100) return measuredNa;
+    return measuredNa + 0.024 * (glucoseMgdl - 100);
+}
+
+function etiologyDefaultLoss(etiology) {
+    switch(etiology) {
+        case 'central_di': return 200;
+        case 'nephrogenic_di': return 180;
+        case 'osmotic': return 120;
+        case 'water_loss': return 62.5;
+        case 'icu': return 80;
+        case 'renal_failure': return 0;
+        default: return 62.5;
+    }
+}
+
+function updateEtiologyDefaults() {
+    const etiology = document.getElementById('etiology').value;
+    const lossInput = document.getElementById('lossRate');
+    const defaultLoss = etiologyDefaultLoss(etiology);
+    lossInput.value = defaultLoss;
+    const rrtSelect = document.getElementById('rrt');
+    if (etiology === 'renal_failure') rrtSelect.value = 'cvvh';
+}
+
+/* ============================================================
+   EFWC CORE — Electrolyte-Free Water Clearance
+   Two methods:
+     A) Electrolyte-based: EFWC = Vurine × [1 − (UNa + UK) / serumNa]
+     B) Osmolality-based:  EFWC = Vurine × [1 − Uosm / serumOsm]
+   Returns { efwc (mL/day), efwcPerHr (mL/hr), method, ... }
+   ============================================================ */
+function computeEFWCCore(urineNa, urineK, urineOsm, urineVolPerDay, serumNa, serumK, serumGlucose) {
+    serumK = serumK || 4.0;
+    serumGlucose = serumGlucose || 100;
+    const serumOsm = 2 * serumNa + (serumGlucose / 18);
+
+    let efwc = null;
+    let method = null;
+    let formula = null;
+    const details = {};
+
+    if (urineNa > 0) {
+        // Electrolyte-based EFWC (Rose/Adrogué approach)
+        const urinaryElectrolytes = urineNa + (urineK || 0);
+        const ratio = urinaryElectrolytes / serumNa;
+        efwc = urineVolPerDay * (1 - ratio);
+        method = 'Electrolyte-based (urine Na⁺ + K⁺)';
+        formula = `EFWC = ${urineVolPerDay} × [1 − (${urineNa} + ${urineK || 0}) / ${serumNa}] = ${efwc.toFixed(0)} mL/day`;
+        details.urinaryElectrolytes = urinaryElectrolytes;
+        details.ratio = ratio;
+        details.lossIndex = urinaryElectrolytes > serumNa ? 'concentrating (>serum)' : 'dilute (<serum)';
+    } else if (urineOsm > 0) {
+        const ratio = urineOsm / serumOsm;
+        efwc = urineVolPerDay * (1 - ratio);
+        method = 'Osmolality-based (urine osm)';
+        formula = `EFWC = ${urineVolPerDay} × [1 − ${urineOsm} / ${serumOsm.toFixed(0)}] = ${efwc.toFixed(0)} mL/day`;
+        details.ratio = ratio;
+        details.serumOsm = serumOsm;
+    } else {
+        return {
+            efwc: null, efwcPerHr: null, method: 'insufficient',
+            formula: null, details: null,
+            warning: 'Enter urine Na⁺ or urine osmolality to compute EFWC.'
+        };
+    }
+
+    return {
+        efwc: Math.max(0, efwc),
+        efwcPerHr: Math.max(0, efwc / 24),
+        efwcRaw: efwc, // may be negative (concentrating urine)
+        method,
+        formula,
+        details,
+        warning: efwc < 0 ? '⚠ Urine is concentrated (electrolyte-rich): free-water clearance is negative — this urine represents net water conservation, not loss. Do not add to ongoing-loss replacement.' : null
+    };
+}
+
+/* ============================================================
+   STANDALONE EFWC PANEL
+   ============================================================ */
+function syncEFWCFromMain() {
+    const na = parseFloat(document.getElementById('serumNa').value) || 145;
+    document.getElementById('efwcSerumNa').value = na;
+    const uo = parseFloat(document.getElementById('urineOutput').value) || 0;
+    document.getElementById('efwcUrineVol').value = Math.round(uo * 24);
+    document.getElementById('efwcUrineNa').value = parseFloat(document.getElementById('urineNa').value) || 0;
+    document.getElementById('efwcUrineOsm').value = parseFloat(document.getElementById('urineOsm').value) || 0;
+    computeStandaloneEFWC();
+}
+
+function computeStandaloneEFWC() {
+    const serumNa = parseFloat(document.getElementById('efwcSerumNa').value) ||
+                    parseFloat(document.getElementById('serumNa').value) || 145;
+    const serumK = parseFloat(document.getElementById('efwcSerumK').value) || 4.0;
+    const urineNa = parseFloat(document.getElementById('efwcUrineNa').value) || 0;
+    const urineK = parseFloat(document.getElementById('efwcUrineK').value) || 0;
+    const urineOsm = parseFloat(document.getElementById('efwcUrineOsm').value) || 0;
+    const urineVol = parseFloat(document.getElementById('efwcUrineVol').value) || 0;
+    const glucose = parseFloat(document.getElementById('glucose').value) || 100;
+
+    const resultDiv = document.getElementById('efwcStandaloneResult');
+
+    if (urineVol <= 0) {
+        resultDiv.innerHTML = `<div class="alert-box info">Enter urine volume (mL/day) to compute EFWC.</div>`;
+        return;
+    }
+
+    const res = computeEFWCCore(urineNa, urineK, urineOsm, urineVol, serumNa, serumK, glucose);
+
+    if (res.method === 'insufficient') {
+        resultDiv.innerHTML = `<div class="alert-box info">${res.warning}</div>`;
+        return;
+    }
+
+    const interpretation = res.efwcRaw < 0
+        ? '<span class="badge badge-blue">Concentrating urine — net water conservation</span>'
+        : res.efwcRaw < 200
+            ? '<span class="badge badge-green">Dilute urine — minimal free-water loss</span>'
+            : res.efwcRaw < 1000
+                ? '<span class="badge badge-orange">Moderate free-water loss</span>'
+                : '<span class="badge badge-red">Large free-water loss — replace actively</span>';
+
+    resultDiv.innerHTML = `
+        <div class="result-card efwc" style="margin-top:12px;">
+            <h4>🧪 EFWC Result — Standalone</h4>
+            <p><strong>Method:</strong> ${res.method}</p>
+            <div class="formula-box">${res.formula}</div>
+            <p><strong>EFWC:</strong> <span style="font-size:1.15rem; font-weight:700; color:${res.efwcRaw < 0 ? '#1a5276' : '#d35400'};">${res.efwc.toFixed(0)} mL/day</span> (${res.efwcPerHr.toFixed(1)} mL/hr)</p>
+            <p style="margin-top:6px;">${interpretation}</p>
+            ${res.warning ? `<div class="alert-box danger" style="margin-top:10px;">${res.warning}</div>` : ''}
+            <div class="alert-box efwc" style="margin-top:10px;">
+                <strong>Clinical use:</strong> If EFWC &gt; 0, this is the free-water volume that must be replaced (in addition to static deficit and insensible losses). If EFWC &lt; 0 (concentrated urine), the kidney is conserving water — do <strong>not</strong> add this to replacement; it means less water is being lost renally.
+            </div>
+        </div>
+    `;
+}
+
+/* ============================================================
+   INSENSIBLE LOSS (fever / tachypnea / burns / vent)
+   ============================================================ */
+function computeInsensibleLoss() {
+    const weight = patientData.weight;
+    const base = patientData.insensibleBase; // mL/kg/day
+    const tempC = patientData.tempC;
+    const feverMult = patientData.feverMult / 100; // convert % to fraction
+    const tachypnea = patientData.tachypnea === 'yes';
+    const burns = patientData.burns === 'yes';
+    const vent = patientData.vent === 'yes';
+
+    let ratePerDay = base * weight; // mL/day baseline
+    const modifiers = [];
+
+    // Fever adjustment: +feverMult per °C above 38
+    if (tempC > 38.0) {
+        const delta = tempC - 38.0;
+        const factor = 1 + (feverMult * delta);
+        ratePerDay *= factor;
+        modifiers.push(`Fever +${(feverMult * delta * 100).toFixed(0)}% (${delta.toFixed(1)}°C > 38)`);
+    }
+
+    if (tachypnea) { ratePerDay *= 1.15; modifiers.push('Tachypnea +15%'); }
+    if (burns)     { ratePerDay *= 1.25; modifiers.push('Burns/wounds +25%'); }
+    if (vent)      { ratePerDay *= 1.20; modifiers.push('Unhumidified vent +20%'); }
+
+    return {
+        ratePerDay,
+        ratePerHr: ratePerDay / 24,
+        baseRatePerHr: (base * weight) / 24,
+        modifiers,
+        tempC, base, feverMult: patientData.feverMult
+    };
+}
+
+/* ============================================================
+   DECOMPOSED ONGOING LOSSES
+   Combines:
+     • Insensible (fever-adjusted)
+     • Urine EFWC
+     • GI output (free-water fraction)
+     • NG output
+     • Ostomy output
+   ============================================================ */
+function computeOngoingLosses() {
+    const { weight, na, glucose, urineOutput, urineNa, urineOsm,
+            giOutput, giNa, ngOutput, ngNa, ostomyOutput, ostomyNa,
+            insensibleOverride } = patientData;
+
+    // 1. Insensible (auto-computed with fever/burns/tachypnea/vent)
+    const insensible = computeInsensibleLoss();
+
+    // 2. Urine EFWC
+    let urineEFWC = 0, urineMethod = 'none', urineWarning = null;
+    if (urineOutput > 0) {
+        const res = computeEFWCCore(urineNa, 0, urineOsm, urineOutput * 24, na, 4.0, glucose);
+        if (res.method !== 'insufficient') {
+            urineEFWC = res.efwcPerHr;
+            urineMethod = res.method;
+            urineWarning = res.warning;
+        }
+    }
+
+    // 3. GI loss — free-water fraction based on tonicity
+    let giFreeWater = 0, giMethod = 'none';
+    if (giOutput > 0) {
+        if (giNa > 0) {
+            // EFWC of GI fluid
+            giFreeWater = giOutput * (1 - (giNa / na));
+            giMethod = `EFWC (GI Na⁺ ${giNa})`;
+        } else {
+            giFreeWater = giOutput * 0.3;
+            giMethod = 'Assumed 30% free water (no GI Na⁺)';
+        }
+    }
+
+    // 4. NG loss
+    let ngFreeWater = 0, ngMethod = 'none';
+    if (ngOutput > 0) {
+        if (ngNa > 0) {
+            ngFreeWater = ngOutput * (1 - (ngNa / na));
+            ngMethod = `EFWC (NG Na⁺ ${ngNa})`;
+        } else {
+            ngFreeWater = ngOutput * 0.3;
+            ngMethod = 'Assumed 30% free water (no NG Na⁺)';
+        }
+    }
+
+    // 5. Ostomy loss
+    let ostomyFreeWater = 0, ostomyMethod = 'none';
+    if (ostomyOutput > 0) {
+        if (ostomyNa > 0) {
+            ostomyFreeWater = ostomyOutput * (1 - (ostomyNa / na));
+            ostomyMethod = `EFWC (ostomy Na⁺ ${ostomyNa})`;
+        } else {
+            ostomyFreeWater = ostomyOutput * 0.2;
+            ostomyMethod = 'Assumed 20% free water (no ostomy Na⁺)';
+        }
+    }
+
+    // If user provided a manual override for insensible (lossRate input), use it
+    let insensibleHr = insensible.ratePerHr;
+    let insensibleSource = 'auto (fever-adjusted)';
+    if (insensibleOverride !== null && insensibleOverride !== undefined && !isNaN(insensibleOverride) && insensibleOverride >= 0) {
+        insensibleHr = insensibleOverride;
+        insensibleSource = 'manual override';
+    }
+
+    const totalOngoing = insensibleHr + urineEFWC + giFreeWater + ngFreeWater + ostomyFreeWater;
+
+    const breakdown = [
+        { key: 'insensible', label: 'Insensible', value: insensibleHr, color: '#3498db', source: insensibleSource, modifiers: insensible.modifiers },
+        { key: 'urine', label: 'Urine EFWC', value: urineEFWC, color: '#e67e22', source: urineMethod, warning: urineWarning },
+        { key: 'gi', label: 'GI', value: giFreeWater, color: '#27ae60', source: giMethod },
+        { key: 'ng', label: 'NG', value: ngFreeWater, color: '#16a085', source: ngMethod },
+        { key: 'ostomy', label: 'Ostomy', value: ostomyFreeWater, color: '#8e44ad', source: ostomyMethod }
+    ].filter(b => b.value > 0);
+
+    return { totalOngoing, breakdown, insensible };
+}
+
+/* ============================================================
+   TONICITY MATCHER
+   Given the dominant loss stream(s) and their Na⁺ content,
+   recommend 5% dextrose / 0.2% NaCl / 0.45% NaCl / 0.9% NaCl.
+   Logic:
+     • Free-water loss (Na⁺ ≈ 0)      → D5W or enteral water
+     • Hypotonic loss (Na⁺ < serum)   → 0.2% or 0.45% NaCl
+     • Isotonic loss (Na⁺ ≈ serum)    → 0.9% NaCl
+     • Hypertonic loss (Na⁺ > serum)  → no free-water replacement needed
+   ============================================================ */
+function computeTonicityMatcher() {
+    const { na, urineOutput, urineNa, urineOsm, giOutput, giNa, ngOutput, ngNa,
+            ostomyOutput, ostomyNa, glucose } = patientData;
+
+    const streams = [];
+
+    // Urine
+    if (urineOutput > 0) {
+        let effectiveNa = urineNa;
+        if (effectiveNa === 0 && urineOsm > 0) {
+            const serumOsm = 2 * na + (glucose / 18);
+            // Approximate urine Na+K from osmolality / 2 (rough)
+            effectiveNa = Math.max(0, (urineOsm / 2) - 20); // rough; urinary urea contributes
+        }
+        streams.push({ name: 'Urine', volume: urineOutput, na: effectiveNa, measured: urineNa > 0 });
+    }
+
+    if (giOutput > 0) streams.push({ name: 'GI', volume: giOutput, na: giNa, measured: giNa > 0 });
+    if (ngOutput > 0) streams.push({ name: 'NG', volume: ngOutput, na: ngNa, measured: ngNa > 0 });
+    if (ostomyOutput > 0) streams.push({ name: 'Ostomy', volume: ostomyOutput, na: ostomyNa, measured: ostomyNa > 0 });
+
+    if (streams.length === 0) {
+        return {
+            streams: [],
+            totalVolume: 0,
+            weightedNa: null,
+            recommendation: {
+                primary: '5% Dextrose IV (or enteral free water)',
+                secondary: null,
+                rationale: 'No measured loss streams — use D5W/enteral water for the static deficit.'
+            }
+        };
+    }
+
+    let weightedNaSum = 0, totalVolume = 0;
+    streams.forEach(s => {
+        weightedNaSum += s.na * s.volume;
+        totalVolume += s.volume;
+    });
+    const weightedNa = totalVolume > 0 ? weightedNaSum / totalVolume : 0;
+
+    let primary, secondary, rationale;
+    if (weightedNa < 50) {
+        primary = '5% Dextrose IV (or enteral free water)';
+        secondary = '0.2% NaCl if some Na⁺ needed';
+        rationale = `Weighted loss Na⁺ = ${weightedNa.toFixed(0)} mEq/L — essentially free water. Replace with D5W or enteral water.`;
+    } else if (weightedNa < 100) {
+        primary = '0.2% NaCl (one-quarter isotonic)';
+        secondary = '0.45% NaCl if Na⁺ losses higher than estimated';
+        rationale = `Weighted loss Na⁺ = ${weightedNa.toFixed(0)} mEq/L — hypotonic. 0.2% NaCl (34 mEq/L) is closest match.`;
+    } else if (weightedNa < 130) {
+        primary = '0.45% NaCl (one-half isotonic)';
+        secondary = '0.2% NaCl if free-water fraction higher';
+        rationale = `Weighted loss Na⁺ = ${weightedNa.toFixed(0)} mEq/L — hypotonic. 0.45% NaCl (77 mEq/L) is closest match.`;
+    } else if (weightedNa < 160) {
+        primary = '0.9% NaCl (isotonic)';
+        secondary = '0.45% NaCl if serum Na⁺ still elevated';
+        rationale = `Weighted loss Na⁺ = ${weightedNa.toFixed(0)} mEq/L — near-isotonic. Match with 0.9% NaCl; ensure serum Na⁺ trend monitored.`;
+    } else {
+        primary = 'No free-water replacement needed';
+        secondary = 'Consider 0.9% NaCl or hypertonic if volume-depleted';
+        rationale = `Weighted loss Na⁺ = ${weightedNa.toFixed(0)} mEq/L — hypertonic (Na⁺ > serum). These losses do not aggravate hypernatremia; replacing with free water could cause hyponatremia.`;
+    }
+
+    return {
+        streams: streams.map(s => ({
+            ...s,
+            percentOfTotal: totalVolume > 0 ? (s.volume / totalVolume * 100) : 0,
+            naDisplay: s.measured ? `${s.na} mEq/L` : `${s.na.toFixed(0)} mEq/L (est.)`
+        })),
+        totalVolume,
+        weightedNa,
+        recommendation: { primary, secondary, rationale }
+    };
+}
+
+/* ============================================================
+   MAIN CALCULATION
+   ============================================================ */
+function calculate() {
+    const naRaw = parseFloat(document.getElementById('serumNa').value);
+    const weight = parseFloat(document.getElementById('weight').value);
+    const height = parseFloat(document.getElementById('height').value);
+    const age = parseFloat(document.getElementById('age').value);
+    const sex = document.getElementById('sex').value;
+    const glucose = parseFloat(document.getElementById('glucose').value) || 100;
+    const duration = document.getElementById('duration').value;
+    const etiology = document.getElementById('etiology').value;
+    const lossRateRaw = document.getElementById('lossRate').value;
+    const lossRate = lossRateRaw === '' ? null : parseFloat(lossRateRaw);
+    const urineOutput = parseFloat(document.getElementById('urineOutput').value) || 0;
+    const urineNa = parseFloat(document.getElementById('urineNa').value) || 0;
+    const urineOsm = parseFloat(document.getElementById('urineOsm').value) || 0;
+    const giOutput = parseFloat(document.getElementById('giOutput').value) || 0;
+    const giNa = parseFloat(document.getElementById('giNa').value) || 0;
+    const ngOutput = parseFloat(document.getElementById('ngOutput').value) || 0;
+    const ngNa = parseFloat(document.getElementById('ngNa').value) || 0;
+    const ostomyOutput = parseFloat(document.getElementById('ostomyOutput').value) || 0;
+    const ostomyNa = parseFloat(document.getElementById('ostomyNa').value) || 0;
+    const insensibleBase = parseFloat(document.getElementById('insensibleBase').value) || 12.5;
+    const tempC = parseFloat(document.getElementById('tempC').value) || 37.0;
+    const feverMult = parseFloat(document.getElementById('feverMult').value) || 12;
+    const tachypnea = document.getElementById('tachypnea').value;
+    const burns = document.getElementById('burns').value;
+    const vent = document.getElementById('vent').value;
+    const enteralRate = parseFloat(document.getElementById('enteralRate').value) || 0;
+    const icu = document.getElementById('icu').value;
+    const charlson = parseFloat(document.getElementById('charlson').value) || 4;
+    const rrt = document.getElementById('rrt').value;
+    const predictionHorizon = parseFloat(document.getElementById('predictionHorizon').value);
+    const maxRate = parseFloat(document.getElementById('maxRate').value);
+    const maxFreeWater = parseFloat(document.getElementById('maxFreeWater').value) || 3000;
+
+    if (isNaN(naRaw) || naRaw < 146) { alert('Enter serum sodium > 145 mEq/L.'); return; }
+    if (isNaN(weight) || weight <= 0) { alert('Enter valid weight.'); return; }
+    if (isNaN(height) || height <= 0) { alert('Enter valid height.'); return; }
+    if (isNaN(age) || age <= 0) { alert('Enter valid age.'); return; }
+
+    const mode = MODES[currentMode];
+    let maxDrop24h = mode.maxDrop24h;
+    let maxDropPerHour = mode.maxDropPerHour;
+
+    if (duration === 'chronic') {
+        maxDrop24h = Math.min(maxDrop24h, 12);
+        maxDropPerHour = Math.min(maxDropPerHour, 0.5);
+    }
+
+    const na = correctedSodium(naRaw, glucose);
+    const tbw = watsonTBW(sex, weight, height, age);
+    const targetNa = na - maxDrop24h;
+    const fwd = tbw * ((na / targetNa) - 1);
+    const deficitRate24h = (fwd * 1000) / 24;
+
+    // Store preliminary data (needed for insensible/EFWC computations)
+    patientData = {
+        naRaw, na, weight, height, age, sex, glucose, duration, etiology, icu, charlson, rrt,
+        tbw, targetNa, fwd, maxDrop24h, maxDropPerHour,
+        deficitRate24h, predictionHorizon, maxRate, maxFreeWater,
+        urineOutput, urineNa, urineOsm, giOutput, giNa, ngOutput, ngNa, ostomyOutput, ostomyNa,
+        insensibleBase, tempC, feverMult, tachypnea, burns, vent,
+        insensibleOverride: lossRate, // may be null
+        enteralRate,
+        mode: currentMode, modeLabel: mode.label, modeColor: mode.color,
+        modeEvidence: mode.evidence, modeRef: mode.ref, modeMortality: mode.mortality30d,
+        measuredEntries: []
+    };
+
+    // Decomposed ongoing losses
+    const ongoing = computeOngoingLosses();
+    patientData.ongoingLosses = ongoing;
+    patientData.totalLossRate = ongoing.totalOngoing;
+
+    // Tonicity matcher
+    const tonicity = computeTonicityMatcher();
+    patientData.tonicity = tonicity;
+
+    // Recomputed infusion rate
+    const uncappedRate = deficitRate24h + ongoing.totalOngoing;
+    const effectiveRate = Math.min(uncappedRate, maxRate);
+    const rateCapped = uncappedRate > maxRate;
+
+    patientData.uncappedRate = uncappedRate;
+    patientData.effectiveRate = effectiveRate;
+    patientData.rateCapped = rateCapped;
+    patientData.lossRate = lossRate; // for display
+
+    entryCounter = 0;
+
+    renderResults();
+}
+
+/* ============================================================
+   MORTALITY PREDICTION
+   ============================================================ */
+function predictMortality() {
+    const { modeMortality, charlson, icu, age, na } = patientData;
+    let baseMortality = modeMortality;
+    const modifiers = [];
+    if (charlson > 5) { baseMortality += 0.05; modifiers.push('CCI >5 (+5%)'); }
+    if (charlson > 7) { baseMortality += 0.05; modifiers.push('CCI >7 (+5%)'); }
+    if (icu === 'yes') { baseMortality += 0.08; modifiers.push('ICU admission (+8%)'); }
+    if (age > 80) { baseMortality += 0.05; modifiers.push('Age >80 (+5%)'); }
+    if (na >= 160) { baseMortality += 0.05; modifiers.push('Na⁺ ≥160 (+5%)'); }
+    baseMortality = Math.min(baseMortality, 0.85);
+    return { predicted: baseMortality, modifiers };
+}
+
+/* ============================================================
+   RRT PRESCRIPTION
+   ============================================================ */
+function computeRRT() {
+    const { rrt, na, tbw, maxDrop24h, weight } = patientData;
+    if (rrt === 'none') return null;
+
+    const targetDrop = maxDrop24h;
+
+    if (rrt === 'cvvh' || rrt === 'cvvhdf') {
+        const dialysateNa = 140;
+        const timeHr = 24;
+        const denominator = (dialysateNa - na) * timeHr;
+        let qEff = 0;
+        if (denominator < 0) qEff = (targetDrop * tbw) / (denominator / 1000);
+        const qEffCapped = Math.min(Math.max(qEff, 0), 4.0);
+        return {
+            modality: rrt === 'cvvh' ? 'CVVH' : 'CVVHDF',
+            dialysateNa,
+            effluentRate: qEffCapped.toFixed(2),
+            effluentRateRaw: qEff.toFixed(2),
+            capped: qEff > 4.0,
+            note: `Use low-Na dialysate/replacement (${dialysateNa} mEq/L). Monitor serum Na⁺ q2–4h.`
+        };
+    }
+
+    if (rrt === 'ihd') {
+        const dialysateNa = 140;
+        const sessionHr = 4;
+        const qd = 500;
+        const totalDialysate = qd * 60 * sessionHr / 1000;
+        const deltaNaPerSession = ((dialysateNa - na) * totalDialysate / tbw);
+        const sessionsNeeded = Math.ceil(targetDrop / Math.abs(deltaNaPerSession));
+        return {
+            modality: 'Intermittent HD',
+            dialysateNa, sessionHr, qd,
+            deltaNaPerSession: deltaNaPerSession.toFixed(2),
+            sessionsNeeded: Math.max(1, sessionsNeeded),
+            note: `Use dialysate Na⁺ ${dialysateNa} mEq/L. Limit ΔNa⁺ to ≤${maxDrop24h} mEq/L/24h. Consider daily sessions until Na⁺ <150.`
+        };
+    }
+
+    if (rrt === 'peritoneal') {
+        const dialysateNa = 132;
+        const dwellVolume = 2.0;
+        const cyclesPerDay = 4;
+        const totalDialysate = dwellVolume * cyclesPerDay;
+        const deltaNaPerDay = ((dialysateNa - na) * totalDialysate / tbw);
+        return {
+            modality: 'Peritoneal Dialysis',
+            dialysateNa, dwellVolume, cyclesPerDay,
+            deltaNaPerDay: deltaNaPerDay.toFixed(2),
+            note: `Use dialysate Na⁺ ${dialysateNa} mEq/L. Adjust dwell volume/cycles to achieve ≤${maxDrop24h} mEq/L/24h.`
+        };
+    }
+    return null;
+}
+
+/* ============================================================
+   DESMOPRESSIN DOSING (Central DI)
+   ============================================================ */
+function computeDesmopressin() {
+    const { etiology, na, urineOutput, weight } = patientData;
+    if (etiology !== 'central_di') return null;
+
+    return {
+        intranasal: '10–20 mcg intranasally q12h (start 10 mcg)',
+        iv_sc: '1–4 mcg IV/SC q12h (start 1–2 mcg)',
+        oral: '0.1–0.2 mg PO q8h (start 0.1 mg)',
+        monitoring: 'Monitor serum Na⁺ q4–6h; titrate to urine output 1–2 mL/kg/hr',
+        caution: 'Avoid overcorrection — DDAVP can cause rapid water retention and hyponatremia. Start low, go slow. Ensure free access to water.',
+        note: `Current urine output: ${urineOutput} mL/hr. Goal: reduce to ~1–2 mL/kg/hr (${(weight * 1).toFixed(0)}–${(weight * 2).toFixed(0)} mL/hr).`
+    };
+}
+
+/* ============================================================
+   RENDER RESULTS
+   ============================================================ */
+function renderResults() {
+    const { naRaw, na, weight, height, age, sex, glucose, duration, etiology, icu, charlson,
+            tbw, targetNa, fwd, maxDrop24h, maxDropPerHour,
+            deficitRate24h, uncappedRate, effectiveRate, rateCapped,
+            predictionHorizon, maxRate, totalLossRate, urineOutput, urineNa, urineOsm,
+            enteralRate, maxFreeWater, rrt,
+            ongoingLosses, tonicity,
+            modeLabel, modeColor, modeEvidence, modeRef, modeMortality } = patientData;
+
+    const mortality = predictMortality();
+    const mortalityClass = mortality.predicted < 0.35 ? 'mortality-low' : mortality.predicted < 0.5 ? 'mortality-mid' : 'mortality-high';
+
+    let html = '';
+
+    // ===== NEJM BASELINE PANEL =====
+    html += `
+        <div class="result-card nejm">
+            <h4>📘 NEJM Baseline — Adrogué &amp; Madias 2000</h4>
+            <p><strong>Reference:</strong> Adrogué HJ, Madias NE. Hypernatremia. <em>N Engl J Med.</em> 2000;342(20):1493-1499.</p>
+            <div class="alert-box info" style="margin-top:10px;">
+                <strong>Three components of total replacement:</strong>
+                <ul style="margin-top:6px;">
+                    <li><strong>Static free-water deficit:</strong> TBW × ([Na]/140 − 1) — corrects water <em>already</em> lost</li>
+                    <li><strong>Ongoing losses:</strong> insensible + urine EFWC + GI/NG/ostomy — <strong>must be added</strong> because the deficit formula does not account for water continuing to be lost</li>
+                    <li><strong>Rate ceiling:</strong> ≤10 mEq/L/24h (chronic), up to 1 mEq/L/h (acute)</li>
+                </ul>
+            </div>
+        </div>
+    `;
+
+    // ===== ONGOING LOSS DECOMPOSITION =====
+    const insensible = ongoingLosses.insensible;
+    const totalOngoing = ongoingLosses.totalOngoing;
+    const dailyTotal = totalOngoing * 24;
+
+    // Build stacked bar
+    let barHtml = '<div class="loss-bar">';
+    ongoingLosses.breakdown.forEach(b => {
+        const pct = totalOngoing > 0 ? (b.value / totalOngoing * 100) : 0;
+        barHtml += `<div class="loss-bar-seg" style="width:${pct}%; background:${b.color};" title="${b.label}: ${b.value.toFixed(1)} mL/hr (${pct.toFixed(0)}%)">${pct > 8 ? b.label : ''}</div>`;
+    });
+    barHtml += '</div>';
+
+    let breakdownRows = '';
+    ongoingLosses.breakdown.forEach(b => {
+        const pct = totalOngoing > 0 ? (b.value / totalOngoing * 100) : 0;
+        breakdownRows += `<tr>
+            <td style="text-align:left;"><span style="display:inline-block; width:10px; height:10px; background:${b.color}; border-radius:2px; margin-right:6px;"></span>${b.label}</td>
+            <td>${b.value.toFixed(1)}</td>
+            <td>${(b.value * 24).toFixed(0)}</td>
+            <td>${pct.toFixed(0)}%</td>
+            <td style="font-size:0.72rem; color:#6a7a8a;">${b.source || ''}</td>
+        </tr>`;
+    });
+
+    html += `
+        <div class="result-card loss-decomp">
+            <h4>💧 Ongoing Loss Decomposition (Adrogué &amp; Madias 2000)</h4>
+            <p style="margin-bottom:8px;">The deficit formula only corrects water <em>already</em> lost. Ongoing losses must be <strong>added</strong> to the replacement plan. Total ongoing loss is displayed below and added to the IV D5W rate.</p>
+            ${barHtml}
+            <table style="margin-top:6px;">
+                <tr><th style="text-align:left;">Component</th><th>mL/hr</th><th>mL/day</th><th>% of total</th><th>Method / source</th></tr>
+                ${breakdownRows}
+                <tr style="background:#eafaf1; font-weight:700;">
+                    <td style="text-align:left;">TOTAL ongoing</td>
+                    <td>${totalOngoing.toFixed(1)}</td>
+                    <td>${dailyTotal.toFixed(0)}</td>
+                    <td>100%</td>
+                    <td style="font-size:0.72rem;">—</td>
+                </tr>
+            </table>
+            ${insensible.modifiers.length > 0 ? `<div class="alert-box info" style="margin-top:10px;"><strong>Insensible modifiers applied:</strong> ${insensible.modifiers.join(', ')} (base ${insensible.base} mL/kg/day × ${weight} kg = ${insensible.baseRatePerHr.toFixed(1)} mL/hr baseline → ${insensible.ratePerHr.toFixed(1)} mL/hr after modifiers)</div>` : ''}
+            ${ongoingLosses.breakdown.find(b => b.warning) ? `<div class="alert-box danger" style="margin-top:10px;">${ongoingLosses.breakdown.find(b => b.warning).warning}</div>` : ''}
+            <div class="alert-box efwc" style="margin-top:10px;">
+                <strong>Fluid choice for the loss component:</strong> replace free water enterally when possible, or with 5% dextrose IV. If ongoing losses contain substantial sodium (e.g., diuretic-driven), part of the replacement should be hypotonic saline (0.45% or 0.2%) matched to the tonicity of what is being lost. See <strong>Tonicity Matcher</strong> below.
+            </div>
+        </div>
+    `;
+
+    // ===== TONICITY MATCHER =====
+    let tonicityRows = '';
+    if (tonicity.streams.length > 0) {
+        tonicity.streams.forEach(s => {
+            tonicityRows += `<tr>
+                <td>${s.name}</td>
+                <td>${s.volume.toFixed(0)}</td>
+                <td>${s.naDisplay}</td>
+                <td>${s.percentOfTotal.toFixed(0)}%</td>
+            </tr>`;
+        });
+    } else {
+        tonicityRows = `<tr><td colspan="4" style="color:#8a9aa8;">No measured loss streams — tonicity match based on static deficit only.</td></tr>`;
+    }
+
+    const recClass = tonicity.weightedNa === null ? 'tonicity-d5w'
+                   : tonicity.weightedNa < 50 ? 'tonicity-d5w'
+                   : tonicity.weightedNa < 130 ? 'tonicity-secondary'
+                   : tonicity.weightedNa < 160 ? 'tonicity-primary'
+                   : 'tonicity-secondary';
+
+    html += `
+        <div class="result-card tonicity">
+            <h4>💧 Tonicity Matcher — Fluid Selection for Loss Replacement</h4>
+            <p>Match the replacement fluid to the <strong>tonicity of the dominant loss stream(s)</strong>:</p>
+            <table style="margin-top:10px;">
+                <tr><th>Loss stream</th><th>mL/hr</th><th>Na⁺ (mEq/L)</th><th>% of total</th></tr>
+                ${tonicityRows}
+                ${tonicity.totalVolume > 0 ? `<tr style="background:#eaf2f8; font-weight:700;"><td>TOTAL / weighted</td><td>${tonicity.totalVolume.toFixed(0)}</td><td>${tonicity.weightedNa.toFixed(0)}</td><td>100%</td></tr>` : ''}
+            </table>
+            <div style="margin-top:12px;">
+                <div class="tonicity-card ${recClass}">→ Primary: ${tonicity.recommendation.primary}</div>
+                ${tonicity.recommendation.secondary ? `<div class="tonicity-card tonicity-secondary">→ Alternative: ${tonicity.recommendation.secondary}</div>` : ''}
+            </div>
+            <div class="alert-box tonicity" style="margin-top:10px;">
+                <strong>Rationale:</strong> ${tonicity.recommendation.rationale}
+            </div>
+            <div class="alert-box info" style="margin-top:10px;">
+                <strong>Reference concentrations:</strong> D5W = 0 mEq/L · 0.2% NaCl = 34 mEq/L · 0.45% NaCl = 77 mEq/L · 0.9% NaCl = 154 mEq/L · 3% NaCl = 513 mEq/L. Match the infusate Na⁺ to the <em>weighted</em> Na⁺ of the combined losses.
+            </div>
+        </div>
+    `;
+
+    // ===== EVIDENCE PANEL =====
+    html += `
+        <div class="result-card evidence">
+            <h4>📊 Evidence Panel — Feigin et al. 2023 Integration</h4>
+            <p><strong>Selected mode:</strong> <span class="badge ${MODES[currentMode].badge}">${modeLabel}</span> — max drop <strong>${maxDrop24h} mEq/L/24h</strong> (${maxDropPerHour.toFixed(2)} mEq/L/h)</p>
+            <p><strong>Evidence:</strong> ${modeEvidence}</p>
+            <p><strong>Reference:</strong> ${modeRef}</p>
+            <div class="alert-box evidence" style="margin-top:10px;">
+                <strong>📖 Feigin et al. (JAMA Netw Open 2023;6(9):e2335415):</strong> In 4,265 adults with severe hypernatremia (Na ≥155):
+                <ul style="margin-top:6px;">
+                    <li><strong>30-day mortality:</strong> 31.8% (fast) vs 50.7% (slow), P &lt; .001</li>
+                    <li><strong>Adjusted OR for survival:</strong> 2.02 (95% CI 1.55–2.62)</li>
+                    <li><strong>No neurological complications</strong> attributed to fast correction (0/343)</li>
+                    <li><strong>Dose-response:</strong> &gt;8 → 64.4%; &gt;10 → 67.9%; &gt;12 → 72.1% survival</li>
+                    <li><strong>1-year mortality:</strong> 51.9% vs 73.1% (P &lt; .001)</li>
+                </ul>
+            </div>
+        </div>
+    `;
+
+    // ===== MORTALITY PREDICTION =====
+    html += `
+        <div class="result-card fast">
+            <h4>🔮 Predicted 30-Day Mortality (Feigin-Based)</h4>
+            <div class="mortality-badge ${mortalityClass}">
+                Predicted 30-day mortality: ${(mortality.predicted * 100).toFixed(1)}%
+            </div>
+            <p style="margin-top:8px; font-size:0.85rem;">Base rate for <strong>${modeLabel}</strong>: ${(modeMortality * 100).toFixed(1)}%</p>
+            ${mortality.modifiers.length > 0 ? `<p style="font-size:0.85rem; margin-top:4px;"><strong>Modifiers:</strong> ${mortality.modifiers.join(', ')}</p>` : ''}
+            <div class="alert-box danger" style="margin-top:10px;">
+                <strong>⚠ Not validated for clinical use:</strong> Observational estimate from a single-center retrospective cohort. Do NOT use for prognostication or treatment decisions.
+            </div>
+        </div>
+    `;
+
+    // ===== PATIENT SUMMARY =====
+    const correctedNote = (glucose > 100 && na !== naRaw)
+        ? `<p style="color:#c0392b; font-size:0.85rem;"><strong>⚠ Corrected Na⁺:</strong> Measured ${naRaw.toFixed(1)} → corrected ${na.toFixed(1)} mEq/L (glucose ${glucose} mg/dL).</p>`
+        : '';
+
+    html += `
+        <div class="result-card ${rateCapped ? 'warning' : ''}">
+            <h4>Patient Summary (Watson Formula)</h4>
+            ${correctedNote}
+            <p><strong>Sex:</strong> ${sex} | <strong>Weight:</strong> ${weight} kg | <strong>Height:</strong> ${height} cm | <strong>Age:</strong> ${age} yr</p>
+            <p><strong>Watson TBW:</strong> ${tbw.toFixed(2)} L</p>
+            <p><strong>Initial Na⁺:</strong> ${na.toFixed(1)} mEq/L | <strong>Target Na⁺ (24h):</strong> ${targetNa.toFixed(1)} mEq/L</p>
+            <p><strong>Free Water Deficit (static):</strong> ${fwd.toFixed(2)} L</p>
+            <p><strong>Total ongoing loss:</strong> <strong>${totalOngoing.toFixed(1)} mL/hr</strong> (${dailyTotal.toFixed(0)} mL/day) — decomposed above</p>
+            <p><strong>IV D5W rate breakdown:</strong> Deficit ${deficitRate24h.toFixed(0)} + ongoing ${totalOngoing.toFixed(1)} = <strong>${effectiveRate.toFixed(0)} mL/hr</strong>${rateCapped ? ` (capped at ${maxRate})` : ''}</p>
+            <p><strong>Enteral free water:</strong> <span class="enteral-rate">${enteralRate} mL/hr</span> (${enteralRate*24} mL/day)</p>
+            ${rateCapped ? `<div class="alert-box danger"><strong>⚠ IV Rate Capped:</strong> Deficit ${deficitRate24h.toFixed(0)} + ongoing ${totalOngoing.toFixed(1)} = ${uncappedRate.toFixed(0)} mL/hr exceeds max ${maxRate}. Using ${maxRate} mL/hr. <strong>Ongoing losses are NOT fully replaced — Na⁺ may continue to rise.</strong></div>` : ''}
+        </div>
+    `;
+
+    // ===== ENTERAL WATER =====
+    if (enteralRate > 0) {
+        const enteralShare = maxFreeWater > 0 ? ((enteralRate * 24) / maxFreeWater) * 100 : 0;
+        html += `
+            <div class="result-card enteral">
+                <h4>🥛 Enteral Free Water — Active</h4>
+                <p><strong>Rate:</strong> ${enteralRate} mL/hr = <strong>${enteralRate*24} mL/day</strong> (${enteralShare.toFixed(0)}% of daily cap)</p>
+                <p style="margin-top:6px; font-size:0.85rem;">Counts toward daily free-water tally but bypasses IV rate cap.</p>
+            </div>
+        `;
+    }
+
+    // ===== RRT PANEL =====
+    const rrtData = computeRRT();
+    if (rrtData) {
+        html += `
+            <div class="result-card rrt">
+                <h4>🩸 Renal Replacement Therapy — ${rrtData.modality}</h4>
+                <p><strong>Indication:</strong> Hypernatremia with renal failure and volume overload (diuretics unreliable).</p>
+                <div class="alert-box rrt" style="margin-top:10px;">
+                    <strong>Prescription:</strong>
+                    <ul style="margin-top:6px;">
+                        <li>Dialysate/replacement Na⁺: <strong>${rrtData.dialysateNa} mEq/L</strong></li>
+                        ${rrtData.effluentRate ? `<li>Effluent rate: <strong>${rrtData.effluentRate} L/hr</strong>${rrtData.capped ? ` (raw ${rrtData.effluentRateRaw} L/hr, capped at 4.0)` : ''}</li>` : ''}
+                        ${rrtData.sessionHr ? `<li>Session: <strong>${rrtData.sessionHr}h</strong>, Qd ${rrtData.qd} mL/min</li>` : ''}
+                        ${rrtData.deltaNaPerSession ? `<li>ΔNa⁺ per session: <strong>${rrtData.deltaNaPerSession} mEq/L</strong></li>` : ''}
+                        ${rrtData.sessionsNeeded ? `<li>Sessions needed: <strong>${rrtData.sessionsNeeded}</strong></li>` : ''}
+                        ${rrtData.dwellVolume ? `<li>Dwell volume: <strong>${rrtData.dwellVolume} L</strong> × ${rrtData.cyclesPerDay} cycles/day</li>` : ''}
+                        ${rrtData.deltaNaPerDay ? `<li>ΔNa⁺ per day: <strong>${rrtData.deltaNaPerDay} mEq/L</strong></li>` : ''}
+                    </ul>
+                </div>
+                <p style="margin-top:10px; font-size:0.85rem;"><strong>Monitoring:</strong> ${rrtData.note}</p>
+                <div class="alert-box danger" style="margin-top:8px;">
+                    <strong>⚠ Limit:</strong> Do not exceed <strong>${maxDrop24h} mEq/L/24h</strong>. Use q1–2h serum Na⁺ monitoring during RRT.
+                </div>
+            </div>
+        `;
+    }
+
+    // ===== DESMOPRESSIN PANEL =====
+    const ddavp = computeDesmopressin();
+    if (ddavp) {
+        html += `
+            <div class="result-card ddavp">
+                <h4>💉 Desmopressin (DDAVP) — Central DI</h4>
+                <p><strong>Indication:</strong> Central diabetes insipidus causing hypernatremia.</p>
+                <table style="margin-top:12px;">
+                    <tr><th>Route</th><th>Dose</th></tr>
+                    <tr><td>Intranasal</td><td>${ddavp.intranasal}</td></tr>
+                    <tr><td>IV / SC</td><td>${ddavp.iv_sc}</td></tr>
+                    <tr><td>Oral</td><td>${ddavp.oral}</td></tr>
+                </table>
+                <div class="alert-box ddavp" style="margin-top:10px;">
+                    <strong>Monitoring:</strong> ${ddavp.monitoring}<br>
+                    <strong>Caution:</strong> ${ddavp.caution}
+                </div>
+                <p style="margin-top:8px; font-size:0.85rem;">${ddavp.note}</p>
+            </div>
+        `;
+    }
+
+    // ===== CHART =====
+    html += `
+        <div class="result-card">
+            <h4>Na⁺ vs Time — Ideal vs Real (48 hours)</h4>
+            <div class="chart-container"><canvas id="naChart"></canvas></div>
+            <div class="legend-note">
+                <span class="legend-ideal">Ideal (${modeLabel})</span>
+                <span class="legend-sim">Simulated</span>
+                <span class="legend-real">Real (measured)</span>
+                <span class="legend-band">Safety corridor</span>
+                <span class="legend-predicted">Predicted D5W</span>
+                <span class="legend-rescue">3% rescue</span>
+                <span class="legend-postrescue">Post-rescue D5W</span>
+                <span class="legend-maint">Post-24h maintenance</span>
+                <span class="legend-enteral">Enteral water</span>
+            </div>
+        </div>
+    `;
+
+    // ===== MASTER TABLE =====
+    html += `
+        <div class="result-card success">
+            <h4>Master Table — Ideal vs Real with 3% Rescue</h4>
+            <div class="table-wrapper" style="max-height:680px;">
+                <table id="masterTable">
+                    <thead>
+                        <tr>
+                            <th>Time (h)</th>
+                            <th>Ideal Na⁺</th>
+                            <th>Simulated Na⁺</th>
+                            <th>Measured Na⁺</th>
+                            <th>IV Fluid</th>
+                            <th>IV Rate (mL/hr)</th>
+                            <th>Enteral (mL/hr)</th>
+                            <th>Cum. Free H₂O (mL)</th>
+                            <th>Phase / Action</th>
+                            <th>Predicted Na⁺</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // ===== 3% RESCUE =====
+    const weightRateLow = Math.min(MAX_3PCT_RATE, Math.round(weight * 1));
+    const weightRateHigh = Math.min(MAX_3PCT_RATE, Math.round(weight * 2));
+
+    html += `
+        <div class="result-card rescue">
+            <h4>🚨 Precise 3% Saline Rescue — Dual Purpose</h4>
+            <p><strong>Method:</strong> Solve Adrogué-Madias for volume targeting <strong>+${RESCUE_TARGET_RISE} mEq/L/h</strong> over <strong>${MIN_RESCUE_HOURS}–${MAX_RESCUE_HOURS}h</strong>, capped at ${MAX_3PCT_RATE} mL/hr.</p>
+            <div class="formula-box">
+                Volume<sub>3%</sub> (L) = [ΔNa<sub>target</sub> × TBW] / (513 − Na<sub>current</sub> − ΔNa<sub>target</sub>)<br>
+                Rate (mL/hr) = min( Volume<sub>3%</sub> × 1000 / Duration, ${MAX_3PCT_RATE} )
+            </div>
+            <p style="margin-top:10px;"><strong>Triggers (any one):</strong></p>
+            <ul style="margin-top:6px;">
+                <li><span class="trigger-pill">RATE</span> Drop &gt; 1.5× expected</li>
+                <li><span class="trigger-pill">ABSOLUTE</span> Na⁺ &lt; ${ABSOLUTE_LOW_NA} mEq/L</li>
+                <li><span class="trigger-pill">FLOOR</span> Na⁺ &lt; target − ${FLOOR_BUFFER}</li>
+                <li><span class="trigger-pill">CUMULATIVE</span> Drop &gt; ${maxDrop24h}/24h or &gt; ${MAX_DROP_48H}/48h</li>
+                <li><span class="trigger-pill failure">FAILURE</span> Na⁺ falling &lt; 30% of expected</li>
+                <li><span class="trigger-pill">SYMPTOMS</span> Neurological signs</li>
+                <li><span class="trigger-pill water">WATER</span> Free water &gt; ${maxFreeWater} mL/24h</li>
+                <li><span class="trigger-pill rrt">RRT</span> RRT running without Na⁺ monitoring</li>
+                <li><span class="trigger-pill ddavp">DDAVP</span> Desmopressin overcorrection</li>
+            </ul>
+            <table style="margin-top:12px;">
+                <tr><th>Parameter</th><th>Value</th></tr>
+                <tr><td>3% NaCl concentration</td><td>513 mEq/L Na⁺</td></tr>
+                <tr><td>Target rise rate</td><td>+${RESCUE_TARGET_RISE} mEq/L/h</td></tr>
+                <tr><td>Duration window</td><td>${MIN_RESCUE_HOURS}–${MAX_RESCUE_HOURS} hours</td></tr>
+                <tr><td>Weight-based range</td><td>${weightRateLow}–${weightRateHigh} mL/hr</td></tr>
+                <tr><td>Absolute maximum</td><td>${MAX_3PCT_RATE} mL/hr</td></tr>
+                <tr><td>Monitoring</td><td>Serum Na⁺ every 30 min</td></tr>
+            </table>
+        </div>
+    `;
+
+    // ===== POST-24H MAINTENANCE =====
+    const maintRate = Math.min(Math.max(0, totalOngoing), maxRate);
+    html += `
+        <div class="result-card success">
+            <h4>♻ Post-24h Maintenance Protocol</h4>
+            <p>After hour ${TARGET_HORIZON}, goal switches to <strong>holding Na⁺ at target</strong> while replacing ongoing losses.</p>
+            <div class="formula-box">Rate<sub>maint</sub> (mL/hr) = min( max(0, Loss<sub>ongoing</sub>) , ${maxRate} )</div>
+            <table style="margin-top:12px;">
+                <tr><td>Target Na⁺ at 24h</td><td>${targetNa.toFixed(1)} mEq/L</td></tr>
+                <tr><td>Ongoing free-water loss</td><td>${totalOngoing.toFixed(1)} mL/hr</td></tr>
+                <tr><td><strong>Maintenance IV D5W rate</strong></td><td><strong class="rescue-rate">${maintRate.toFixed(0)} mL/hr</strong></td></tr>
+                <tr><td>Monitoring</td><td>Serum Na⁺ q4–6h</td></tr>
+            </table>
+        </div>
+    `;
+
+    // ===== FOLLOW-UP ENTRIES =====
+    html += `
+        <div class="result-card warning">
+            <h4>Flexible Follow-up Entries</h4>
+            <p style="font-size:0.88rem; color:#3a4a5a;">
+                Add each measured Na⁺ with its exact time. The tool computes the adjustment, checks for overcorrection AND undercorrection, and triggers 3% rescue when needed.
+            </p>
+            <div class="btn-row" style="margin-bottom:12px;">
+                <button class="btn btn-primary btn-small" onclick="addEntry()">+ Add Measured Na⁺ Entry</button>
+                <button class="btn btn-danger btn-small" onclick="clearEntries()">Clear All Entries</button>
+            </div>
+            <div id="entriesContainer"></div>
+        </div>
+    `;
+
+    // ===== ADJUSTMENT PROTOCOL =====
+    const dropPerHour = maxDrop24h / 24;
+    const dropPerInterval = dropPerHour * predictionHorizon;
+    html += `
+        <div class="result-card">
+            <h4>Adjustment Protocol (${predictionHorizon}h horizon, ${modeLabel} mode)</h4>
+            <p><strong>Expected drop over ${predictionHorizon}h:</strong> ${dropPerInterval.toFixed(2)} mEq/L</p>
+            <table style="margin-top:12px;">
+                <tr><th>Measured Drop vs Expected</th><th>Interpretation</th><th>Action</th></tr>
+                <tr><td>&gt; 1.5× expected</td><td><span class="badge badge-red">Overcorrection</span></td><td><strong>STOP D5W + 3% rescue</strong></td></tr>
+                <tr><td>1.2–1.5× expected</td><td><span class="badge badge-orange">Too fast</span></td><td>Reduce IV D5W 25–50%</td></tr>
+                <tr><td>0.8–1.2× expected</td><td><span class="badge badge-green">On target</span></td><td>Continue current rates</td></tr>
+                <tr><td>0.5–0.8× expected</td><td><span class="badge badge-orange">Too slow</span></td><td>Recompute IV D5W; consider ↑ enteral</td></tr>
+                <tr><td>&lt; 0.5× expected or rising</td><td><span class="badge badge-red">Undercorrection</span></td><td>Recompute; ↑ enteral; reassess losses</td></tr>
+                <tr><td>&lt; 0.3× expected</td><td><span class="badge badge-purple">Failure to correct</span></td><td><strong>Consider 3% rescue or escalate mode</strong></td></tr>
+            </table>
+            <div class="alert-box danger" style="margin-top:12px;">
+                <strong>Safety:</strong> Max IV D5W ${maxRate} mL/hr. Max Na⁺ drop ≤${maxDrop24h} mEq/L/24h. Max 3% rate ${MAX_3PCT_RATE} mL/hr. Max total free water ${maxFreeWater} mL/24h.
+            </div>
+            <div class="alert-box info" style="margin-top:10px;">
+                <strong>📌 Titrate to serial sodium:</strong> The observed Na⁺ change exceeded formula prediction in ~74% of cases (Scorza 2024). Recheck serum Na⁺ every <strong>2–4 h</strong> and adjust the infusion rate rather than trusting any pre-computed total volume.
+            </div>
+        </div>
+    `;
+
+    // ===== REFERENCES =====
+    html += `
+        <div class="result-card refs">
+            <h4>📚 References</h4>
+            <ol class="ref-list">
+                <li>Adrogué HJ, Madias NE. Hypernatremia. <em>N Engl J Med.</em> 2000;342(20):1493-9. doi:10.1056/NEJM200005183422006.</li>
+                <li>Brown DH, Paloian NJ. Hypokalemia/Hyperkalemia and Hyponatremia/Hypernatremia. <em>Pediatrics in Review.</em> 2023;44(7):349-362. doi:10.1542/pir.2021-005119.</li>
+                <li>Li G, Wang L, Qian Q. Electrolyte Disorders. <em>Evidence-Based Nephrology, 2nd Edition.</em> 2022.</li>
+                <li>Atila C, Refardt J, Christ-Crain M. Arginine Vasopressin Deficiency and Oxytocin Deficiency in the Endocrine Clinic. <em>J Clin Endocrinol Metab.</em> 2026;111(4):922-937. doi:10.1210/clinem/dgaf651.</li>
+                <li>Scorza WE, Maynard S. Fluid and Electrolyte Balance. <em>Critical Care Obstetrics, 7th Edition.</em> 2024.</li>
+                <li>Feigin E, et al. Fast correction of severe hypernatremia and mortality. <em>JAMA Netw Open.</em> 2023;6(9):e2335415.</li>
+            </ol>
+        </div>
+    `;
+
+    document.getElementById('resultsContainer').innerHTML = html;
+    document.getElementById('step1').classList.add('hidden');
+    document.getElementById('step2').classList.remove('hidden');
+
+    rebuildMasterTable();
+    drawChart();
+}
+
+/* ============================================================
+   TRIGGER DETECTION
+   ============================================================ */
+function detectTriggers(entry) {
+    const { na, maxDrop24h, maxDropPerHour, targetNa, maxFreeWater, enteralRate, rrt, etiology } = patientData;
+    const dropPerHour = maxDrop24h / 24;
+    const idealNa = na - dropPerHour * entry.timeHr;
+    const expectedDrop = na - idealNa;
+    const actualDrop = na - entry.na;
+    const ratio = expectedDrop !== 0 ? actualDrop / expectedDrop : 1;
+
+    const triggers = [];
+    if (ratio > 1.5) triggers.push({ code: 'RATE', label: 'Rate > 1.5×', detail: `Actual ${actualDrop.toFixed(2)} vs expected ${expectedDrop.toFixed(2)}` });
+    if (entry.na < ABSOLUTE_LOW_NA) triggers.push({ code: 'ABSOLUTE', label: `Na⁺ < ${ABSOLUTE_LOW_NA}`, detail: `Measured ${entry.na.toFixed(1)}` });
+    if (entry.na < targetNa - FLOOR_BUFFER) triggers.push({ code: 'FLOOR', label: `> ${FLOOR_BUFFER} below target`, detail: `Target ${targetNa.toFixed(1)}` });
+    if (actualDrop > maxDrop24h && entry.timeHr <= 24) triggers.push({ code: 'CUMULATIVE-24h', label: `> ${maxDrop24h} in 24h`, detail: `Drop ${actualDrop.toFixed(2)}` });
+    if (actualDrop > MAX_DROP_48H) triggers.push({ code: 'CUMULATIVE-48h', label: `> ${MAX_DROP_48H} in 48h`, detail: `Drop ${actualDrop.toFixed(2)}` });
+    if (entry.timeHr >= 4 && entry.timeHr <= 12 && actualDrop < 0.3 * expectedDrop && actualDrop < 2) {
+        triggers.push({ code: 'FAILURE', label: 'Failure to correct', detail: `Only ${actualDrop.toFixed(2)} mEq/L drop at ${entry.timeHr}h (expected ${expectedDrop.toFixed(2)})` });
+    }
+    if (enteralRate > 0) triggers.push({ code: 'ENTERAL', label: 'Enteral water active', detail: `${enteralRate} mL/hr` });
+    if (rrt !== 'none') triggers.push({ code: 'RRT', label: 'RRT active', detail: `${rrt} — verify Na⁺ q1–2h` });
+    if (etiology === 'central_di') triggers.push({ code: 'DDAVP', label: 'Central DI — DDAVP', detail: 'Monitor for overcorrection' });
+
+    return { triggers, needsRescue: triggers.filter(t => !['ENTERAL','RRT','DDAVP'].includes(t.code)).length > 0, idealNa, expectedDrop, actualDrop, ratio };
+}
+
+/* ============================================================
+   SAFETY CLAMP
+   ============================================================ */
+function safetyClamp(currentNa, proposedRate, timeHr) {
+    if (proposedRate <= 0) return { clamped: false, rate: 0 };
+    if (isRateSafe(proposedRate, currentNa, timeHr)) return { clamped: false, rate: proposedRate };
+    let lo = 0, hi = proposedRate, safe = 0;
+    for (let i = 0; i < 30; i++) {
+        const mid = (lo + hi) / 2;
+        if (isRateSafe(mid, currentNa, timeHr)) { safe = mid; lo = mid; } else hi = mid;
+    }
+    let reason = 'Clamped by safety limits';
+    if (safe <= 0.5) reason = 'Clamped: no safe D5W rate — STOP D5W';
+    return { clamped: true, rate: Math.round(safe), reason };
+}
+
+function isRateSafe(rate, currentNa, timeHr) {
+    const { tbw, na, maxDrop24h, maxFreeWater, enteralRate, totalLossRate } = patientData;
+    const targetNa = na - maxDrop24h;
+    if (rate <= 0 && enteralRate <= 0) return true;
+    if (rate <= 0) rate = 0;
+
+    const horizon = Math.max(timeHr + 0.5, TARGET_HORIZON);
+    const steps = Math.ceil(horizon - timeHr);
+    let simNa = currentNa;
+    for (let h = 1; h <= steps; h++) {
+        const ivVolL = rate / 1000;
+        const entVolL = enteralRate / 1000;
+        const lossVolL = totalLossRate / 1000;
+        const waterIn = ivVolL + entVolL;
+        const waterOut = lossVolL;
+        const newTBW = tbw + waterIn - waterOut;
+        if (newTBW <= 0) return false;
+        const naIn = ivVolL * 0;
+        const dNa = (naIn - simNa * (waterIn - waterOut)) / newTBW;
+        simNa = simNa + dNa;
+        const absHour = timeHr + h;
+        const cumulativeDrop = na - simNa;
+        if (absHour <= 24 && cumulativeDrop > maxDrop24h) return false;
+        if (cumulativeDrop > MAX_DROP_48H) return false;
+        if (absHour <= TARGET_HORIZON && simNa < targetNa - FLOOR_TOLERANCE) return false;
+        if (simNa < ABSOLUTE_LOW_NA) return false;
+    }
+    const ivOver24 = rate * 24;
+    const enteralOver24 = enteralRate * 24;
+    if (ivOver24 + enteralOver24 > maxFreeWater) {
+        const remainingHr = Math.max(0, TARGET_HORIZON - timeHr);
+        const effectiveWindow = Math.min(24, remainingHr);
+        if ((rate + enteralRate) * effectiveWindow > maxFreeWater) return false;
+    }
+    return true;
+}
+
+/* ============================================================
+   PRECISE 3% RESCUE
+   ============================================================ */
+function computePreciseRescue(entry) {
+    const { na, tbw, maxDrop24h, maxRate, totalLossRate } = patientData;
+    const dropPerHour = maxDrop24h / 24;
+    const timeHr = entry.timeHr;
+    const measuredNa = entry.na;
+    const idealNa = na - dropPerHour * timeHr;
+
+    if (measuredNa >= idealNa - 0.01) return null;
+    const riseToIdeal = idealNa - measuredNa;
+    if (riseToIdeal <= 0) return null;
+
+    let duration = MIN_RESCUE_HOURS;
+    let deltaNaTarget = Math.min(riseToIdeal, RESCUE_TARGET_RISE * duration);
+
+    function volumeForDelta(deltaNa, naCurrent, tbwVal) {
+        const denominator = NACL_3PCT_CONC - naCurrent - deltaNa;
+        if (denominator <= 0) return null;
+        return (deltaNa * tbwVal) / denominator;
+    }
+
+    let volumeL = volumeForDelta(deltaNaTarget, measuredNa, tbw);
+    if (volumeL === null) return null;
+    let rateRaw = (volumeL * 1000) / duration;
+
+    if (rateRaw > MAX_3PCT_RATE && duration < MAX_RESCUE_HOURS) {
+        duration = MAX_RESCUE_HOURS;
+        deltaNaTarget = Math.min(riseToIdeal, RESCUE_TARGET_RISE * duration);
+        volumeL = volumeForDelta(deltaNaTarget, measuredNa, tbw);
+        if (volumeL === null) return null;
+        rateRaw = (volumeL * 1000) / duration;
+    }
+
+    const preciseRate = Math.min(rateRaw, MAX_3PCT_RATE);
+    const capped = rateRaw > MAX_3PCT_RATE;
+    const volumeML = volumeL * 1000;
+
+    const trajectory = [{ hour: timeHr, na: measuredNa, phase: 'RESCUE-START' }];
+    let simNa = measuredNa;
+    let stoppedAt = null;
+    let stopReason = null;
+
+    for (let h = 1; h <= duration; h++) {
+        const vL = preciseRate / 1000;
+        const dNa = vL * (NACL_3PCT_CONC - simNa) / (tbw + vL);
+        simNa = simNa + dNa;
+        const currentHr = timeHr + h;
+        const idealAtH = na - dropPerHour * currentHr;
+        trajectory.push({ hour: currentHr, na: simNa, phase: 'RESCUE' });
+        if (simNa >= idealAtH) { stoppedAt = currentHr; stopReason = 'Na⁺ reached ideal curve'; break; }
+    }
+    if (stoppedAt === null) { stoppedAt = timeHr + duration; stopReason = `${duration}h rescue window completed`; }
+
+    const remainingHr = Math.max(0.5, TARGET_HORIZON - stoppedAt);
+    const remainingDrop = simNa - (na - maxDrop24h);
+
+    let postDeficitRate = 0;
+    let postRateReason = '';
+    if (remainingDrop > 0.05) {
+        const denom = simNa - remainingDrop;
+        if (denom > 0) {
+            const volumeLPost = (remainingDrop * tbw) / denom;
+            postDeficitRate = (volumeLPost * 1000) / remainingHr;
+            postRateReason = `Recomputed deficit ${postDeficitRate.toFixed(0)} + loss ${totalLossRate.toFixed(1)} mL/hr`;
+        }
+    }
+
+    let postRateRaw = postDeficitRate + totalLossRate;
+    const postRateUncapped = postRateRaw;
+    if (postRateRaw > maxRate) { postRateRaw = maxRate; postRateReason += ` — capped at ${maxRate}`; }
+
+    const postClamp = safetyClamp(simNa, Math.round(postRateRaw), stoppedAt);
+    const postRescueRate = postClamp.clamped ? postClamp.rate : Math.round(postRateRaw);
+    const postRescueClamped = postClamp.clamped;
+    const postRescueReason = postClamp.clamped ? postClamp.reason : postRateReason;
+
+    const maintRate = Math.min(Math.max(0, totalLossRate), maxRate);
+    const postTrajectory = [{ hour: stoppedAt, na: simNa }];
+    let postNa = simNa;
+    for (let h = 1; h <= 24; h++) {
+        const absHour = stoppedAt + h;
+        if (absHour > 48) break;
+        const rateNow = absHour <= TARGET_HORIZON ? postRescueRate : maintRate;
+        const vL = rateNow / 1000;
+        const lossVolL = totalLossRate / 1000;
+        const waterIn = vL;
+        const waterOut = lossVolL;
+        const newTBW = tbw + waterIn - waterOut;
+        if (newTBW <= 0) break;
+        const dNa = (0 - postNa * (waterIn - waterOut)) / newTBW;
+        postNa = postNa + dNa;
+        postTrajectory.push({ hour: absHour, na: postNa });
+    }
+
+    return {
+        preciseRate: Math.round(preciseRate * 10) / 10,
+        rateRaw: Math.round(rateRaw * 10) / 10,
+        volumeML: Math.round(volumeML),
+        deltaNaTarget: Math.round(deltaNaTarget * 100) / 100,
+        duration, capped, stoppedAt, stopReason, finalNa: simNa, trajectory,
+        postRescueRate, postDeficitRate: Math.round(postDeficitRate),
+        postRateUncapped: Math.round(postRateUncapped),
+        postRescueClamped, postRescueReason, postTrajectory
+    };
+}
+
+/* ============================================================
+   ADJUSTMENT COMPUTATION
+   ============================================================ */
+function computeAdjustment(entry) {
+    const { na, tbw, maxDrop24h, effectiveRate, maxRate, predictionHorizon, totalLossRate } = patientData;
+    const timeHr = entry.timeHr;
+    const measuredNa = entry.na;
+
+    const detect = detectTriggers(entry);
+    const { idealNa, expectedDrop, actualDrop, ratio, needsRescue, triggers } = detect;
+
+    if (timeHr >= TARGET_HORIZON) {
+        const maintRate = Math.min(Math.max(0, totalLossRate), maxRate);
+        const clamp = safetyClamp(measuredNa, maintRate, timeHr);
+        const finalRate = clamp.clamped ? clamp.rate : maintRate;
+        const action = clamp.clamped ? `Maintenance (clamped): ${clamp.reason} (${finalRate} mL/hr)` : `Maintenance D5W @ ${finalRate} mL/hr`;
+        const color = clamp.clamped ? '#c0392b' : '#16a085';
+        let predictedNa = measuredNa;
+        if (finalRate > 0) {
+            const vL = (finalRate * predictionHorizon) / 1000;
+            const lossVolL = (totalLossRate * predictionHorizon) / 1000;
+            const newTBW = tbw + vL - lossVolL;
+            if (newTBW > 0) {
+                const dNa = (0 - measuredNa * (vL - lossVolL)) / newTBW;
+                predictedNa = measuredNa + dNa;
+            }
+        }
+        return { timeHr, measuredNa, idealNa, actualDrop, expectedDrop, ratio, factor: 0, action, color, adjRate: finalRate, adjDeficitRate: 0, predictedNa, predictionHorizon, rescue: null, triggers, needsRescue: false, isMaintenance: true };
+    }
+
+    let deficitRate = Math.round(effectiveRate - totalLossRate);
+    if (deficitRate < 0) deficitRate = 0;
+
+    let factor = 1.0, action = 'On target', color = '#27ae60';
+    if (needsRescue) { factor = 0; action = 'STOP D5W'; color = '#c0392b'; }
+    else if (ratio > 1.2) { factor = 0.5; action = 'Reduce 50%'; color = '#e67e22'; }
+    else if (ratio < 0.3) { factor = 2.0; action = 'Failure to correct — escalate'; color = '#8e44ad'; }
+    else if (ratio < 0.5) { factor = 2.0; action = 'Increase (recomputed)'; color = '#c0392b'; }
+    else if (ratio < 0.8) { factor = 1.5; action = 'Increase (recomputed)'; color = '#e67e22'; }
+
+    let adjDeficitRate = Math.round(deficitRate * factor);
+
+    if (!needsRescue && (ratio < 0.8 || ratio > 1.2)) {
+        const remainingHr = Math.max(0.5, TARGET_HORIZON - timeHr);
+        const desiredDropToTarget = measuredNa - (na - maxDrop24h);
+        if (desiredDropToTarget > 0) {
+            const denom = measuredNa - desiredDropToTarget;
+            if (denom > 0) {
+                const volumeL = (desiredDropToTarget * tbw) / denom;
+                let recomputedDeficitRate = (volumeL * 1000) / remainingHr;
+                recomputedDeficitRate = Math.min(recomputedDeficitRate, maxRate);
+                adjDeficitRate = Math.round(recomputedDeficitRate);
+                action = `Recomputed deficit ${adjDeficitRate} + loss ${totalLossRate.toFixed(1)} mL/hr → target by 24h`;
+                color = '#e67e22';
+            }
+        } else if (desiredDropToTarget <= 0 && measuredNa < na - maxDrop24h) {
+            adjDeficitRate = 0;
+            action = 'Na⁺ below target — STOP deficit D5W';
+            color = '#c0392b';
+        }
+    }
+
+    let adjRate = adjDeficitRate + totalLossRate;
+    const adjRateUncapped = adjRate;
+    adjRate = Math.min(adjRate, maxRate);
+
+    if (adjRateUncapped > maxRate && !needsRescue) {
+        action = `Rate capped at ${maxRate}`;
+        color = '#c0392b';
+    }
+
+    const clamp = safetyClamp(measuredNa, adjRate, timeHr);
+    if (clamp.clamped) {
+        adjRate = clamp.rate;
+        action = clamp.reason + ` (${adjRate} mL/hr)`;
+        color = '#c0392b';
+    }
+
+    let predictedNa = measuredNa;
+    if (adjRate > 0) {
+        const vL = (adjRate * predictionHorizon) / 1000;
+        const lossVolL = (totalLossRate * predictionHorizon) / 1000;
+        const newTBW = tbw + vL - lossVolL;
+        if (newTBW > 0) {
+            const dNa = (0 - measuredNa * (vL - lossVolL)) / newTBW;
+            predictedNa = measuredNa + dNa;
+        }
+    }
+
+    let rescue = null;
+    if (needsRescue) {
+        rescue = computePreciseRescue(entry);
+        if (rescue) rescue.triggers = triggers;
+    }
+
+    return { timeHr, measuredNa, idealNa, actualDrop, expectedDrop, ratio, factor, action, color, adjRate, adjDeficitRate, adjRateUncapped, predictedNa, predictionHorizon, rescue, triggers, needsRescue, isMaintenance: false };
+}
+
+/* ============================================================
+   RATE SEGMENTS
+   ============================================================ */
+function buildRateSegments(adjustments) {
+    const { effectiveRate, totalLossRate, maxRate } = patientData;
+    const maintRate = Math.min(Math.max(0, totalLossRate), maxRate);
+    const segments = [];
+    let currentRate = effectiveRate;
+    let currentFluid = 'D5W';
+    let currentAction = `Baseline correction (deficit + ${totalLossRate.toFixed(1)} mL/hr loss)`;
+    let currentColor = '#1a5276';
+    let segStart = 0;
+    let inMaintenance = false;
+
+    for (const adj of adjustments) {
+        if (adj.timeHr < segStart) {
+            for (let i = segments.length - 1; i >= 0; i--) {
+                if (segments[i].startHr >= adj.timeHr) segments.splice(i, 1);
+                else if (segments[i].endHr > adj.timeHr) segments[i].endHr = adj.timeHr;
+                else break;
+            }
+            segStart = adj.timeHr;
+        }
+
+        if (adj.timeHr > segStart) {
+            segments.push({ startHr: segStart, endHr: adj.timeHr, rate: currentRate, fluid: currentFluid, action: currentAction, color: currentColor, isMaintenance: inMaintenance });
+        }
+
+        if (adj.rescue) {
+            segments.push({ startHr: adj.timeHr, endHr: adj.rescue.stoppedAt, rate: adj.rescue.preciseRate, fluid: '3% NaCl', action: `3% rescue @ ${adj.rescue.preciseRate} mL/hr`, color: '#e67e22', isMaintenance: false });
+            const postEnd = Math.min(48, TARGET_HORIZON);
+            segments.push({ startHr: adj.rescue.stoppedAt, endHr: postEnd, rate: adj.rescue.postRescueRate, fluid: 'D5W', action: `Post-rescue D5W @ ${adj.rescue.postRescueRate}`, color: '#27ae60', isMaintenance: false });
+            if (postEnd < 48) segments.push({ startHr: postEnd, endHr: 48, rate: maintRate, fluid: 'D5W', action: `Maintenance D5W @ ${maintRate} mL/hr`, color: '#16a085', isMaintenance: true });
+            currentRate = maintRate; currentFluid = 'D5W'; currentAction = 'Maintenance D5W'; currentColor = '#16a085'; segStart = Math.min(48, postEnd); inMaintenance = true;
+        } else if (adj.isMaintenance) {
+            segments.push({ startHr: adj.timeHr, endHr: 48, rate: adj.adjRate, fluid: 'D5W', action: adj.action, color: adj.color, isMaintenance: true });
+            currentRate = adj.adjRate; currentFluid = 'D5W'; currentAction = adj.action; currentColor = adj.color; segStart = adj.timeHr; inMaintenance = true;
+        } else {
+            currentRate = adj.adjRate; currentFluid = 'D5W'; currentAction = adj.action; currentColor = adj.color; segStart = adj.timeHr; inMaintenance = false;
+        }
+    }
+
+    if (segStart < TARGET_HORIZON) {
+        segments.push({ startHr: segStart, endHr: TARGET_HORIZON, rate: currentRate, fluid: currentFluid, action: currentAction, color: currentColor, isMaintenance: false });
+        segments.push({ startHr: TARGET_HORIZON, endHr: 48, rate: maintRate, fluid: 'D5W', action: `Maintenance D5W @ ${maintRate} mL/hr`, color: '#16a085', isMaintenance: true });
+    } else if (segStart < 48) {
+        segments.push({ startHr: segStart, endHr: 48, rate: currentRate, fluid: currentFluid, action: currentAction, color: currentColor, isMaintenance: inMaintenance });
+    }
+
+    segments.sort((a, b) => a.startHr - b.startHr || a.endHr - b.endHr);
+    return segments;
+}
+
+function getActiveSegFrom(segments, t) {
+    let best = null;
+    for (const seg of segments) {
+        if (t >= seg.startHr && t < seg.endHr) {
+            if (best === null || seg.startHr > best.startHr) best = seg;
+        }
+    }
+    if (best) return best;
+    return segments[segments.length - 1] || { rate: patientData.effectiveRate, fluid: 'D5W', action: 'Baseline', color: '#1a5276', isMaintenance: false };
+}
+
+/* ============================================================
+   FREE WATER CUMULATIVE
+   ============================================================ */
+function computeCumulativeFreeWater(rateSegments) {
+    const enteralRate = patientData.enteralRate || 0;
+    const hourlyIV = new Array(48).fill(0);
+    for (const seg of rateSegments) {
+        if (seg.fluid !== 'D5W') continue;
+        const start = Math.max(0, Math.floor(seg.startHr));
+        const end = Math.min(48, Math.ceil(seg.endHr));
+        for (let h = start; h < end; h++) {
+            const overlapStart = Math.max(seg.startHr, h);
+            const overlapEnd = Math.min(seg.endHr, h + 1);
+            const frac = Math.max(0, overlapEnd - overlapStart);
+            hourlyIV[h] += seg.rate * frac;
+        }
+    }
+    const hourlyEnteral = new Array(48).fill(0);
+    for (let h = 0; h < 48; h++) hourlyEnteral[h] = enteralRate;
+    const hourlyTotal = hourlyIV.map((v, i) => v + hourlyEnteral[i]);
+    const cumTotal = [0], cumIV = [0];
+    for (let h = 0; h < 48; h++) { cumTotal.push(cumTotal[h] + hourlyTotal[h]); cumIV.push(cumIV[h] + hourlyIV[h]); }
+    const rolling24Total = new Array(49).fill(0);
+    const rolling24IV = new Array(49).fill(0);
+    for (let h = 0; h <= 48; h++) {
+        const start = Math.max(0, h - 24);
+        rolling24Total[h] = cumTotal[h] - cumTotal[start];
+        rolling24IV[h] = cumIV[h] - cumIV[start];
+    }
+    let maxWindow = 0, maxWindowEnd = 0;
+    for (let h = 0; h <= 48; h++) {
+        if (rolling24Total[h] > maxWindow) { maxWindow = rolling24Total[h]; maxWindowEnd = h; }
+    }
+    return { maxWindow, maxWindowEnd, hourlyIV, hourlyEnteral, hourlyTotal, cumTotal, cumIV, rolling24Total, rolling24IV };
+}
+
+function checkDailyFreeWater(rateSegments) {
+    const cap = patientData.maxFreeWater;
+    const { maxWindow, maxWindowEnd } = computeCumulativeFreeWater(rateSegments);
+    return { exceeded: maxWindow > cap, maxWindow, maxWindowEnd, cap };
+}
+
+/* ============================================================
+   CORRECTED SIMULATION
+   ============================================================ */
+function simulateNa(rateSegments, sortedEntries) {
+    const { na, tbw, enteralRate, totalLossRate, maxDrop24h } = patientData;
+    const dropPerHour = maxDrop24h / 24;
+    const targetNa = na - maxDrop24h;
+
+    const anchorMap = {};
+    sortedEntries.forEach(e => { anchorMap[e.timeHr] = e.na; });
+
+    const simulated = { 0: na };
+    let simNa = na;
+
+    for (let t = 1; t <= 48; t++) {
+        if (anchorMap[t] !== undefined) {
+            simNa = anchorMap[t];
+            simulated[t] = simNa;
+            continue;
+        }
+
+        const seg = getActiveSegFrom(rateSegments, t - 1);
+        const ivVolL = seg.rate / 1000;
+        const entVolL = enteralRate / 1000;
+        const lossVolL = totalLossRate / 1000;
+        const naConcIV = seg.fluid === '3% NaCl' ? NACL_3PCT_CONC : 0;
+
+        const naIn = ivVolL * naConcIV;
+        const waterIn = ivVolL + entVolL;
+        const waterOut = lossVolL;
+        const newTBW = tbw + waterIn - waterOut;
+
+        if (newTBW <= 0) { simulated[t] = simNa; continue; }
+
+        let dNa = (naIn - simNa * (waterIn - waterOut)) / newTBW;
+
+        if (t <= TARGET_HORIZON && dNa < -dropPerHour) {
+            dNa = -dropPerHour;
+        }
+        if (t <= TARGET_HORIZON && simNa + dNa < targetNa) {
+            dNa = targetNa - simNa;
+        }
+
+        simNa = simNa + dNa;
+        simulated[t] = simNa;
+    }
+    return simulated;
+}
+
+/* ============================================================
+   MASTER TABLE
+   ============================================================ */
+function rebuildMasterTable() {
+    const { na, maxDrop24h, predictionHorizon, measuredEntries, maxFreeWater, enteralRate, rrt } = patientData;
+    const dropPerHour = maxDrop24h / 24;
+    const tbody = document.getElementById('masterTableBody');
+    if (!tbody) return;
+
+    const measuredMap = {};
+    measuredEntries.forEach(e => { measuredMap[e.timeHr] = e; });
+    const timeSet = new Set();
+    for (let h = 0; h <= 48; h++) timeSet.add(h);
+    measuredEntries.forEach(e => { timeSet.add(e.timeHr); timeSet.add(e.timeHr + predictionHorizon); });
+
+    const sortedEntries = [...measuredEntries].sort((a, b) => a.timeHr - b.timeHr);
+    const adjustments = sortedEntries.map(e => computeAdjustment(e));
+    adjustments.forEach(adj => {
+        if (adj.rescue) {
+            timeSet.add(adj.rescue.stoppedAt);
+            adj.rescue.postTrajectory.forEach(p => timeSet.add(p.hour));
+        }
+    });
+    timeSet.add(TARGET_HORIZON);
+    const times = Array.from(timeSet).filter(t => t >= 0 && t <= 48).sort((a, b) => a - b);
+
+    const rateSegments = buildRateSegments(adjustments);
+    const getActiveSeg = (t) => getActiveSegFrom(rateSegments, t);
+    const simulatedNa = simulateNa(rateSegments, sortedEntries);
+    const { cumTotal, rolling24Total, cumIV } = computeCumulativeFreeWater(rateSegments);
+
+    let rows = '';
+    times.forEach(t => {
+        const idealNa = na - dropPerHour * t;
+        const simNaVal = simulatedNa[t];
+        const measured = measuredMap[t];
+        const isMeasured = !!measured;
+        const isStepRow = rateSegments.some(seg => seg.startHr === t && seg.startHr > 0);
+        const isPredictedRow = adjustments.some(adj => Math.abs(adj.timeHr + predictionHorizon - t) < 0.001);
+        const isRescueStopRow = adjustments.some(adj => adj.rescue && Math.abs(adj.rescue.stoppedAt - t) < 0.001);
+        const isMaintStartRow = Math.abs(t - TARGET_HORIZON) < 0.001;
+        const activeSeg = getActiveSeg(t);
+
+        const cumFreeWater = Math.round(cumTotal[Math.min(t, 48)]);
+        const cumIVOnly = Math.round(cumIV[Math.min(t, 48)]);
+        const rolling = Math.round(rolling24Total[Math.min(t, 48)]);
+        const overWater = rolling > maxFreeWater;
+        const enteralCum = Math.max(0, cumFreeWater - cumIVOnly);
+
+        let fluidCell, rateCell;
+        const rescueStartAdj = adjustments.find(a => a.timeHr === t && a.rescue);
+        const rescueStopAdj = adjustments.find(a => a.rescue && Math.abs(a.rescue.stoppedAt - t) < 0.001);
+
+        if (rescueStartAdj) {
+            fluidCell = `<span style="color:#e67e22; font-weight:700;">3% NaCl</span>`;
+            rateCell = `<span style="color:#e67e22; font-weight:700;">${rescueStartAdj.rescue.preciseRate}</span>`;
+        } else if (rescueStopAdj) {
+            fluidCell = `<span style="color:#1a5276;">D5W</span>`;
+            rateCell = `<span style="color:#27ae60; font-weight:700;">${rescueStopAdj.rescue.postRescueRate}</span>`;
+        } else {
+            fluidCell = activeSeg.fluid === '3% NaCl' ? `<span style="color:#e67e22; font-weight:700;">3% NaCl</span>` : `<span style="color:#1a5276;">D5W</span>`;
+            rateCell = `<span style="color:${activeSeg.color}; font-weight:700;">${activeSeg.rate}</span>`;
+        }
+
+        let actionCell = '—';
+        if (isMeasured) {
+            const adj = adjustments.find(a => a.timeHr === t);
+            if (adj) {
+                if (adj.rescue) actionCell = `<span style="color:#c0392b; font-weight:700;">STOP D5W → 3% @ ${adj.rescue.preciseRate} mL/hr (${adj.triggers.map(tr=>tr.code).join('+')})</span>`;
+                else actionCell = `<span style="color:${adj.color}; font-weight:700;">${adj.action}</span>`;
+            }
+        } else if (isRescueStopRow) {
+            const adj = adjustments.find(a => a.rescue && Math.abs(a.rescue.stoppedAt - t) < 0.001);
+            if (adj) actionCell = `<span style="color:#c0392b; font-weight:700;">STOP 3% — ${adj.rescue.stopReason}</span>`;
+        } else if (isMaintStartRow) {
+            actionCell = `<span style="color:#16a085; font-weight:700;">→ Maintenance phase begins</span>`;
+        } else if (isStepRow) {
+            actionCell = `<span style="color:${activeSeg.color}; font-weight:700;">${activeSeg.action}</span>`;
+        }
+
+        const measuredCell = isMeasured ? `<strong>${measured.na.toFixed(1)}</strong>` : '—';
+        let predictedCell = '—';
+        if (isPredictedRow) {
+            const adj = adjustments.find(a => Math.abs(a.timeHr + predictionHorizon - t) < 0.001);
+            if (adj) {
+                if (adj.rescue) predictedCell = `<strong style="color:#e67e22;">${adj.rescue.finalNa.toFixed(1)}</strong>`;
+                else if (adj.adjRate > 0) predictedCell = `<strong style="color:#d4ac0d;">${adj.predictedNa.toFixed(1)}</strong>`;
+                else predictedCell = `<span style="color:#c0392b;">—</span>`;
+            }
+        }
+
+        const enteralCell = enteralRate > 0 ? `<span style="color:#0e6251; font-weight:600;">${enteralRate}</span>` : `<span style="color:#8a9aa8;">—</span>`;
+        const waterCell = overWater
+            ? `<span style="color:#c0392b; font-weight:700;" title="IV ${cumIVOnly} + enteral ${enteralCum} = ${cumFreeWater} mL | Rolling 24h: ${rolling} mL > cap ${maxFreeWater} mL">${cumFreeWater} ⚠</span>`
+            : `<span style="color:#3a4a5a;" title="IV ${cumIVOnly} + enteral ${enteralCum} = ${cumFreeWater} mL | Rolling 24h: ${rolling} mL / cap ${maxFreeWater} mL">${cumFreeWater}</span>`;
+
+        let rowClass = '';
+        if (isMeasured) {
+            const adj = adjustments.find(a => a.timeHr === t);
+            rowClass = (adj && adj.rescue) ? 'row-rescue' : (adj && adj.isMaintenance) ? 'row-maint' : (adj && adj.triggers.some(tr => tr.code === 'FAILURE')) ? 'row-fast' : 'row-measured';
+        } else if (isRescueStopRow) rowClass = 'row-stop-rescue';
+        else if (isMaintStartRow) rowClass = 'row-maint';
+        else if (isPredictedRow) rowClass = 'row-predicted';
+        else if (isStepRow) rowClass = activeSeg.isMaintenance ? 'row-maint' : 'row-step';
+        if (overWater) rowClass = 'row-overwater';
+        if (rrt !== 'none' && t === 0) rowClass = 'row-rrt';
+
+        rows += `<tr class="${rowClass}"><td>${t.toFixed(1)}</td><td>${idealNa.toFixed(2)}</td><td>${simNaVal !== undefined ? simNaVal.toFixed(2) : '—'}</td><td>${measuredCell}</td><td>${fluidCell}</td><td>${rateCell}</td><td>${enteralCell}</td><td>${waterCell}</td><td>${actionCell}</td><td>${predictedCell}</td></tr>`;
+    });
+    tbody.innerHTML = rows;
+}
+
+/* ============================================================
+   CHART
+   ============================================================ */
+function drawChart() {
+    const { na, maxDrop24h, measuredEntries, predictionHorizon, enteralRate } = patientData;
+    const dropPerHour = maxDrop24h / 24;
+
+    const hours = [], idealNa = [], bandUpper = [], bandLower = [];
+    for (let h = 0; h <= 48; h++) {
+        hours.push(h);
+        idealNa.push(na - dropPerHour * h);
+        bandUpper.push(na - (8 / 24) * h);
+        bandLower.push(na - (maxDrop24h / 24) * h);
+    }
+
+    const sortedEntries = [...measuredEntries].sort((a, b) => a.timeHr - b.timeHr);
+    const adjustments = sortedEntries.map(e => computeAdjustment(e));
+    const realPoints = [{ x: 0, y: na }];
+    sortedEntries.forEach(e => realPoints.push({ x: e.timeHr, y: e.na }));
+    const rateSegments = buildRateSegments(adjustments);
+    const simulatedDict = simulateNa(rateSegments, sortedEntries);
+    const simulatedPoints = [];
+    for (let h = 0; h <= 48; h++) if (simulatedDict[h] !== undefined) simulatedPoints.push({ x: h, y: simulatedDict[h] });
+
+    let enteralOnlyPoints = null;
+    if (enteralRate > 0) {
+        enteralOnlyPoints = [];
+        let eNa = na;
+        enteralOnlyPoints.push({ x: 0, y: eNa });
+        for (let h = 1; h <= 48; h++) {
+            const vL = enteralRate / 1000;
+            const newTBW = patientData.tbw + vL;
+            const dNa = (0 - eNa * vL) / newTBW;
+            eNa = eNa + dNa;
+            enteralOnlyPoints.push({ x: h, y: eNa });
+        }
+    }
+
+    const predictedConnectors = [], rescueConnectors = [], postRescueConnectors = [];
+    adjustments.forEach(adj => {
+        if (adj.rescue) {
+            rescueConnectors.push({ x: adj.timeHr, y: adj.measuredNa });
+            adj.rescue.trajectory.forEach(pt => rescueConnectors.push({ x: pt.hour, y: pt.na }));
+            rescueConnectors.push({ x: null, y: null });
+            postRescueConnectors.push({ x: adj.rescue.stoppedAt, y: adj.rescue.finalNa });
+            adj.rescue.postTrajectory.forEach(pt => postRescueConnectors.push({ x: pt.hour, y: pt.na }));
+            postRescueConnectors.push({ x: null, y: null });
+        } else if (adj.adjRate > 0) {
+            predictedConnectors.push({ x: adj.timeHr, y: adj.measuredNa });
+            predictedConnectors.push({ x: adj.timeHr + predictionHorizon, y: adj.predictedNa });
+            predictedConnectors.push({ x: null, y: null });
+        }
+    });
+
+    const ctx = document.getElementById('naChart').getContext('2d');
+    if (naChart) naChart.destroy();
+
+    const datasets = [
+        { label: 'Safety corridor', data: bandUpper, borderColor: 'rgba(39,174,96,0)', backgroundColor: 'rgba(39,174,96,0.15)', fill: '+1', pointRadius: 0, tension: 0, order: 9 },
+        { label: 'Lower bound', data: bandLower, borderColor: 'rgba(39,174,96,0)', backgroundColor: 'rgba(39,174,96,0)', pointRadius: 0, tension: 0, order: 10 },
+        { label: 'Ideal Na⁺', data: idealNa, borderColor: '#2e86c1', backgroundColor: 'rgba(46,134,193,0.1)', borderWidth: 2.5, borderDash: [8, 5], pointRadius: 0, tension: 0, order: 5 },
+        { label: 'Simulated (IV + enteral + loss)', data: simulatedPoints, borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.1)', borderWidth: 2, borderDash: [3, 3], pointRadius: 0, tension: 0, parsing: false, order: 4 },
+        { label: 'Real Na⁺ (measured)', data: realPoints, borderColor: '#c0392b', backgroundColor: '#c0392b', borderWidth: 2.5, pointRadius: 6, pointHoverRadius: 8, pointBackgroundColor: '#c0392b', pointBorderColor: 'white', pointBorderWidth: 2, tension: 0.15, parsing: false, order: 3 },
+        { label: `Predicted Na⁺ in ${predictionHorizon}h`, data: predictedConnectors, borderColor: '#f1c40f', backgroundColor: '#f1c40f', borderWidth: 2, borderDash: [5, 4], pointRadius: (ctx) => (ctx.dataIndex % 3 === 1) ? 8 : 0, pointHoverRadius: 10, pointBackgroundColor: '#f1c40f', pointBorderColor: '#7d6608', pointBorderWidth: 2, pointStyle: 'rectRot', tension: 0, parsing: false, spanGaps: false, order: 2 },
+        { label: `3% Rescue`, data: rescueConnectors, borderColor: '#e67e22', backgroundColor: '#e67e22', borderWidth: 2.5, borderDash: [6, 4], pointRadius: (ctx) => { const pt = rescueConnectors[ctx.dataIndex]; return (pt && pt.x !== null) ? 6 : 0; }, pointHoverRadius: 8, pointBackgroundColor: '#e67e22', pointBorderColor: '#7e5109', pointBorderWidth: 2, pointStyle: 'rectRot', tension: 0, parsing: false, spanGaps: false, order: 1 },
+        { label: 'Post-rescue D5W', data: postRescueConnectors, borderColor: '#27ae60', backgroundColor: '#27ae60', borderWidth: 2.5, borderDash: [4, 3], pointRadius: (ctx) => { const pt = postRescueConnectors[ctx.dataIndex]; return (pt && pt.x !== null) ? 6 : 0; }, pointHoverRadius: 8, pointBackgroundColor: '#27ae60', pointBorderColor: '#145a32', pointBorderWidth: 2, pointStyle: 'rectRot', tension: 0, parsing: false, spanGaps: false, order: 0 }
+    ];
+
+    if (enteralOnlyPoints) {
+        datasets.push({ label: `Enteral water only @ ${enteralRate} mL/hr`, data: enteralOnlyPoints, borderColor: '#0e6251', backgroundColor: 'rgba(14,98,81,0.1)', borderWidth: 1.8, borderDash: [2, 4], pointRadius: 0, tension: 0, parsing: false, order: 6 });
+    }
+
+    naChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: hours, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'nearest', intersect: false },
+            plugins: {
+                legend: { display: true, position: 'top', labels: { usePointStyle: true, boxWidth: 10, font: { size: 10 } } },
+                tooltip: { callbacks: { title: (items) => `Time: ${items[0].parsed.x} h`, label: (item) => { const y = item.parsed.y; if (y === null || y === undefined) return ''; return `${item.dataset.label}: ${y.toFixed(2)} mEq/L`; } } }
+            },
+            scales: {
+                x: { type: 'linear', title: { display: true, text: 'Time (hours)', font: { size: 13, weight: 'bold' } }, min: 0, max: 48, ticks: { stepSize: 4 } },
+                y: { title: { display: true, text: 'Serum Na⁺ (mEq/L)', font: { size: 13, weight: 'bold' } }, ticks: { callback: (v) => v.toFixed(0) } }
+            }
+        }
+    });
+}
+
+/* ============================================================
+   ENTRIES
+   ============================================================ */
+function addEntry() {
+    const container = document.getElementById('entriesContainer');
+    const id = entryCounter++;
+    const row = document.createElement('div');
+    row.className = 'result-card';
+    row.style.background = '#ffffff';
+    row.style.borderLeftColor = '#27ae60';
+    row.id = `entry_${id}`;
+    row.innerHTML = `
+        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="input-group" style="min-width:110px;"><label>Time Drawn (hours)</label><input type="number" class="time-input" id="time_${id}" placeholder="e.g., 3.5" step="0.1" min="0" max="48" onchange="recalcEntry(${id})"></div>
+            <div class="input-group" style="min-width:110px;"><label>Measured Na⁺ (mEq/L)</label><input type="number" class="measured-input" id="na_${id}" placeholder="e.g., 154" step="0.1" min="100" max="220" onchange="recalcEntry(${id})"></div>
+            <div style="flex:1; min-width:260px;"><div id="result_${id}" style="font-size:0.85rem; line-height:1.6; color:#3a4a5a;">Enter time and Na⁺ to see adjustment.</div></div>
+            <button class="btn btn-danger btn-small" onclick="removeEntry(${id})">✕ Remove</button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+function removeEntry(id) {
+    const el = document.getElementById(`entry_${id}`);
+    if (el) el.remove();
+    patientData.measuredEntries = patientData.measuredEntries.filter(e => e.id !== id);
+    rebuildMasterTable();
+    drawChart();
+}
+
+function clearEntries() {
+    document.getElementById('entriesContainer').innerHTML = '';
+    entryCounter = 0;
+    if (patientData) patientData.measuredEntries = [];
+    rebuildMasterTable();
+    drawChart();
+}
+
+function recalcEntry(id) {
+    const timeHr = parseFloat(document.getElementById(`time_${id}`).value);
+    const measuredNa = parseFloat(document.getElementById(`na_${id}`).value);
+    const resultDiv = document.getElementById(`result_${id}`);
+    if (isNaN(timeHr) || isNaN(measuredNa)) { resultDiv.innerHTML = 'Enter both time and Na⁺.'; return; }
+
+    const adj = computeAdjustment({ timeHr, na: measuredNa });
+    const { predictionHorizon, totalLossRate, maxFreeWater, enteralRate, rrt, etiology } = patientData;
+
+    let triggerPills = '';
+    if (adj.triggers.length > 0) triggerPills = adj.triggers.map(tr => {
+        let cls = 'trigger-pill';
+        if (tr.code === 'ENTERAL') cls = 'trigger-pill enteral';
+        else if (tr.code === 'WATER') cls = 'trigger-pill water';
+        else if (tr.code === 'FAILURE') cls = 'trigger-pill failure';
+        else if (tr.code === 'RRT') cls = 'trigger-pill rrt';
+        else if (tr.code === 'DDAVP') cls = 'trigger-pill ddavp';
+        return `<span class="${cls}">${tr.code}</span>`;
+    }).join(' ');
+
+    let rescueHtml = '';
+    if (adj.rescue) {
+        const triggerList = adj.triggers.map(tr => `<li><strong>${tr.code}:</strong> ${tr.label} — <em>${tr.detail}</em></li>`).join('');
+        const trajectoryList = adj.rescue.trajectory.map(pt => `@${pt.hour.toFixed(1)}h: ${pt.na.toFixed(1)}`).join(' → ');
+        const postList = adj.rescue.postTrajectory.map(pt => `@${pt.hour.toFixed(1)}h: ${pt.na.toFixed(1)}`).join(' → ');
+        rescueHtml = `
+            <div style="margin-top:10px; padding:12px 14px; background:#fdebd0; border-left:4px solid #e67e22; border-radius:6px;">
+                <strong style="color:#7e5109;">🚨 Precise 3% Saline Rescue</strong>
+                <div style="margin-top:4px;">${triggerPills}</div>
+                <ul style="margin-top:6px; padding-left:20px; font-size:0.85rem;">${triggerList}</ul>
+                <div class="formula-box" style="margin:8px 0;">
+                    ΔNa<sub>target</sub> = ${adj.rescue.deltaNaTarget} mEq/L<br>
+                    V<sub>3%</sub> = ${adj.rescue.volumeML} mL<br>
+                    Rate = <strong style="color:#c0392b;">${adj.rescue.preciseRate} mL/hr</strong>${adj.rescue.capped ? ' (capped)' : ''}<br>
+                    Duration = ${adj.rescue.duration}h
+                </div>
+                <strong>Stop reason:</strong> ${adj.rescue.stopReason}<br>
+                <strong>Na⁺ at stop:</strong> <strong style="color:#e67e22;">${adj.rescue.finalNa.toFixed(1)}</strong><br>
+                <div style="margin-top:6px; font-size:0.85rem;"><strong>Trajectory:</strong> ${trajectoryList}</div>
+                <div style="margin-top:8px; padding:8px 10px; background:#eafaf1; border-left:3px solid #27ae60; border-radius:4px; font-size:0.85rem;">
+                    <strong style="color:#1e8449;">→ Resume D5W at ${adj.rescue.postRescueRate} mL/hr</strong>
+                    ${adj.rescue.postRescueClamped ? `<br><span style="color:#c0392b; font-size:0.8rem;">⚠ ${adj.rescue.postRescueReason}</span>` : ''}
+                    <br>Post-rescue: ${postList}
+                </div>
+            </div>
+        `;
+    }
+
+    const predictedDisplay = adj.adjRate > 0 ? `<strong style="color:#d4ac0d;">${adj.predictedNa.toFixed(1)} mEq/L</strong>` : `<strong style="color:#c0392b;">D5W stopped</strong>`;
+    const modeLabel = adj.isMaintenance ? '<span style="color:#16a085; font-weight:700;">[Maintenance phase]</span> ' : '';
+
+    const allEntries = [...patientData.measuredEntries.filter(e => e.id !== id), { id, timeHr, na: measuredNa }];
+    const sortedE = allEntries.sort((a,b) => a.timeHr - b.timeHr);
+    const adjs = sortedE.map(e => computeAdjustment(e));
+    const segs = buildRateSegments(adjs);
+    const fwCheck = checkDailyFreeWater(segs);
+
+    const enteralNote = enteralRate > 0 ? `<div class="alert-box enteral" style="margin-top:8px;"><strong>🥛 Enteral:</strong> ${enteralRate} mL/hr counted in tally but bypasses IV cap.</div>` : '';
+    const waterWarning = fwCheck.exceeded
+        ? `<div class="alert-box danger" style="margin-top:8px;"><strong>⚠ Daily free-water cap exceeded:</strong> Highest rolling 24h = ${Math.round(fwCheck.maxWindow)} mL (cap ${maxFreeWater}).</div>`
+        : `<div class="alert-box info" style="margin-top:8px;"><strong>ℹ Total free water:</strong> Highest rolling 24h = ${Math.round(fwCheck.maxWindow)} mL (cap ${maxFreeWater}).</div>`;
+
+    const isFailure = adj.triggers.some(t => t.code === 'FAILURE');
+    const failureNote = isFailure ? `<div class="alert-box fast" style="margin-top:8px;"><strong>🚀 Failure to correct detected:</strong> Na⁺ falling slower than expected. Consider escalating mode (Regular → Fast → Ultra-Fast) or 3% rescue. Reassess etiology — untreated DI may require desmopressin.</div>` : '';
+
+    const rrtNote = rrt !== 'none' ? `<div class="alert-box rrt" style="margin-top:8px;"><strong>🩸 RRT active (${rrt}):</strong> Monitor serum Na⁺ q1–2h during RRT. Do not exceed ${patientData.maxDrop24h} mEq/L/24h.</div>` : '';
+    const ddavpNote = etiology === 'central_di' ? `<div class="alert-box ddavp" style="margin-top:8px;"><strong>💉 Central DI:</strong> Consider desmopressin. Monitor for overcorrection.</div>` : '';
+
+    resultDiv.innerHTML = `
+        <div>${modeLabel}<strong>Expected at ${timeHr}h:</strong> ${adj.idealNa.toFixed(2)} | <strong>Measured:</strong> ${measuredNa.toFixed(1)} | <strong>Actual drop:</strong> ${adj.actualDrop.toFixed(2)} (expected ${adj.expectedDrop.toFixed(2)})</div>
+        <div style="margin-top:6px;"><span style="color:${adj.color}; font-weight:700;">Action: ${adj.action}</span> → <strong>IV D5W: ${adj.adjRate} mL/hr</strong>${adj.isMaintenance ? '' : ` [deficit ${adj.adjDeficitRate} + ongoing ${totalLossRate.toFixed(1)}]`}</div>
+        <div style="margin-top:6px;"><strong>Predicted Na⁺ at ${(timeHr + predictionHorizon).toFixed(1)}h:</strong> ${predictedDisplay}</div>
+        ${enteralNote}
+        ${waterWarning}
+        ${failureNote}
+        ${rrtNote}
+        ${ddavpNote}
+        ${rescueHtml}
+    `;
+
+    const existingIdx = patientData.measuredEntries.findIndex(e => e.id === id);
+    if (existingIdx >= 0) patientData.measuredEntries[existingIdx] = { id, timeHr, na: measuredNa };
+    else patientData.measuredEntries.push({ id, timeHr, na: measuredNa });
+
+    rebuildMasterTable();
+    drawChart();
+}
+
+function resetAll() {
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step1').classList.remove('hidden');
+    document.getElementById('resultsContainer').innerHTML = '';
+    document.getElementById('efwcStandaloneResult').innerHTML = '';
+    patientData = {};
+    entryCounter = 0;
+    if (naChart) { naChart.destroy(); naChart = null; }
+}
+
+document.getElementById('etiology').addEventListener('change', updateEtiologyDefaults);
+
+// Initialize defaults on load
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('lossRate').value = DEFAULT_SENSIBLE_LOSS;
+    selectMode('regular');
+});
+</script>
+
+</body>
+</html>
